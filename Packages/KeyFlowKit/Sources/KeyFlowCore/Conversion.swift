@@ -138,6 +138,12 @@ public protocol ConversionEngine: AnyObject {
     func resetLearning()
     /// ユーザー辞書を差し替える
     func updateUserDictionary(_ entries: [UserDictionaryEntry])
+    /// メモリが足りないときに、作り直せるキャッシュを捨てる
+    func purgeMemory()
+}
+
+extension ConversionEngine {
+    public func purgeMemory() {}
 }
 
 /// ユーザー辞書の1語

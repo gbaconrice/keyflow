@@ -1,0 +1,130 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      bundle_id:
+        description: "バンドルID（署名でIDが使えないときに変える）"
+        required: false
+        default: "jp.keyflow.ime"
+      app_group:
+        description: "App Group ID"
+        required: false
+        default: "group.jp.keyflow.ime"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BUNDLE_ID: ${{ inputs.bundle_id || 'jp.keyflow.ime' }}
+  APP_GROUP: ${{ inputs.app_group || 'group.jp.keyflow.ime' }}
+  SWIFT_LINUX_URL: https://download.swift.org/swift-6.3.3-release/ubuntu2404/swift-6.3.3-RELEASE/swift-6.3.3-RELEASE-ubuntu24.04.tar.gz
+
+jobs:
+  core:
+    name: Core tests and conversion eval (Linux)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Swift
+        run: |
+          curl -sSfL -o swift.tar.gz "$SWIFT_LINUX_URL"
+          mkdir -p "$HOME/swift"
+          tar xzf swift.tar.gz -C "$HOME/swift" --strip-components=1
+          echo "$HOME/swift/usr/bin" >> "$GITHUB_PATH"
+      - uses: actions/cache@v4
+        with:
+          path: Packages/KeyFlowKit/.build
+          key: linux-build-${{ hashFiles('Packages/KeyFlowKit/Package.swift', 'Packages/KeyFlowKit/Package.resolved') }}
+      - name: Unit tests
+        working-directory: Packages/KeyFlowKit
+        run: swift test
+      - name: Conversion evaluation
+        working-directory: Packages/KeyFlowKit
+        run: |
+          swift build -c release --product KeyFlowEval
+          .build/release/KeyFlowEval ../../eval/corpus.tsv | tee ../../eval-report.md
+          cat ../../eval-report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eval-report
+          path: eval-report.md
+
+  ios:
+    name: iOS build, IPA, simulator tests
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: Tools
+        run: |
+          brew install xcodegen
+          xcodebuild -version
+          swift --version
+      - name: Generate Xcode project
+        run: xcodegen generate
+      - uses: actions/cache@v4
+        with:
+          path: ~/Library/Developer/Xcode/DerivedData/**/SourcePackages
+          key: spm-${{ hashFiles('Packages/KeyFlowKit/Package.swift', 'Packages/KeyFlowKit/Package.resolved') }}
+      - name: Build for device (unsigned)
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project KeyFlow.xcodeproj -scheme KeyFlow -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            KEYFLOW_BUNDLE_ID="$BUNDLE_ID" KEYFLOW_APP_GROUP="$APP_GROUP" \
+            2>&1 | tee build-device.log | grep -E "error:|warning: .*KeyFlow|BUILD (SUCCEEDED|FAILED)" || true
+          grep -q "BUILD SUCCEEDED" build-device.log
+      - name: Package IPA
+        run: scripts/package-ipa.sh build/Build/Products/Release-iphoneos/KeyFlow.app "$PWD/KeyFlow.ipa" "$APP_GROUP"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KeyFlow-ipa
+          path: KeyFlow.ipa
+          retention-days: 30
+      - name: Package tests on simulator
+        working-directory: Packages/KeyFlowKit
+        run: |
+          set -o pipefail
+          DEST="$(../../scripts/pick-simulator.sh)"
+          xcodebuild test -scheme KeyFlowKit-Package -destination "$DEST" 2>&1 | tee ../../test-package.log | grep -E "error:|✘|Test run|Executed|TEST (SUCCEEDED|FAILED)" || true
+          grep -qE "TEST SUCCEEDED|Test run with .* passed" ../../test-package.log
+      - name: UI tests with screenshots
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          DEST="$(scripts/pick-simulator.sh)"
+          xcodebuild test -project KeyFlow.xcodeproj -scheme KeyFlow -destination "$DEST" \
+            -resultBundlePath TestResults.xcresult CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee test-ui.log | grep -E "error:|Test Case|TEST (SUCCEEDED|FAILED)" || true
+          grep -q "TEST SUCCEEDED" test-ui.log
+      - name: Export screenshots
+        if: always()
+        run: |
+          mkdir -p screenshots
+          if [ -d TestResults.xcresult ]; then
+            xcrun xcresulttool export attachments --path TestResults.xcresult --output-path screenshots || true
+          fi
+          ls screenshots | head -50
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: screenshots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: logs
+          path: |
+            build-device.log
+            test-package.log
+            test-ui.log

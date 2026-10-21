@@ -154,4 +154,12 @@ public final class SimulatedTextField: TextDocument {
     public func clearLog() {
         operationLog.removeAll()
     }
+
+    /// 空にする
+    public func reset() {
+        text = ""
+        cursor = 0
+        markedRange = nil
+        operationLog.removeAll()
+    }
 }

@@ -7,4 +7,3 @@ build/
 xcuserdata/
 *.ipa
 .DS_Store
-Packages/KeyFlowKit/Package.resolved

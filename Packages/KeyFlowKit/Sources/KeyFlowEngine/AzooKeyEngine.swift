@@ -6,7 +6,21 @@ import KanaKanjiConverterModuleWithDefaultDictionary
 ///
 /// スレッドセーフではない。`ConversionQueue`の直列キューからのみ呼び出すこと。
 public final class AzooKeyEngine: ConversionEngine {
-    private let converter: KanaKanjiConverter
+    /// 辞書の準備に時間がかかるため、最初に使うとき（変換キュー上）に作る。
+    /// メモリが足りなくなったときは捨てて、次に使うときに作り直す。
+    private var loadedConverter: KanaKanjiConverter?
+    private var converter: KanaKanjiConverter {
+        if let loadedConverter {
+            return loadedConverter
+        }
+        let c = KanaKanjiConverter.withDefaultDictionary(preloadDictionary: false)
+        if !userDictionary.isEmpty {
+            c.importDynamicUserDictionary(userDictionary)
+        }
+        loadedConverter = c
+        return c
+    }
+    private var userDictionary: [DicdataElement] = []
     private let memoryDirectory: URL
     private let sharedDirectory: URL
     private let versionString: String
@@ -23,7 +37,6 @@ public final class AzooKeyEngine: ConversionEngine {
     ///   - memoryDirectory: 学習データを書き込むディレクトリ（キーボード拡張自身のコンテナ）
     ///   - sharedDirectory: 読み取り専用で参照する共有ディレクトリ（App Group）。無ければ`memoryDirectory`
     public init(memoryDirectory: URL, sharedDirectory: URL? = nil, versionString: String = "KeyFlow") {
-        self.converter = KanaKanjiConverter.withDefaultDictionary(preloadDictionary: false)
         self.memoryDirectory = memoryDirectory
         self.sharedDirectory = sharedDirectory ?? memoryDirectory
         self.versionString = versionString
@@ -143,6 +156,14 @@ public final class AzooKeyEngine: ConversionEngine {
         converter.stopComposition()
     }
 
+    /// 変換器と辞書の一部を先に読み込んでおく（キーボード表示直後の最初の変換を速くする）
+    public func warmUp() {
+        var composing = ComposingText()
+        composing.insertAtCursorPosition("あ", inputStyle: .direct)
+        _ = converter.requestCandidates(composing, options: requestOptions(ConversionOptions(), prediction: false))
+        converter.stopComposition()
+    }
+
     public func flushLearning() {
         converter.commitUpdateLearningData()
     }
@@ -165,7 +186,18 @@ public final class AzooKeyEngine: ConversionEngine {
             }
             return DicdataElement(word: entry.word, ruby: ruby, cid: cid, mid: mid, value: -5)
         }
+        userDictionary = elements
         converter.importDynamicUserDictionary(elements)
+    }
+
+    /// 読み込んだ辞書を手放してメモリを空ける（学習データは保存してから）
+    public func purgeMemory() {
+        guard let loadedConverter else { return }
+        loadedConverter.commitUpdateLearningData()
+        self.loadedConverter = nil
+        lastResult = nil
+        lastNextWord = nil
+        lastCommitted = nil
     }
 }
 

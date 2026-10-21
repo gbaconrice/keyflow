@@ -28,6 +28,8 @@ let package = Package(
             ]
         ),
         .target(name: "KeyFlowKeyboardUI", dependencies: ["KeyFlowCore"]),
+        // 変換精度・速度の評価ツール（eval/README.md）。アプリには含まれない。
+        .executableTarget(name: "KeyFlowEval", dependencies: ["KeyFlowEngine", "KeyFlowCore"]),
         .testTarget(name: "KeyFlowCoreTests", dependencies: ["KeyFlowCore"]),
         .testTarget(name: "KeyFlowEngineTests", dependencies: ["KeyFlowEngine", "KeyFlowCore"]),
     ],
