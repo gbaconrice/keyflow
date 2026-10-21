@@ -31,6 +31,8 @@ public final class SimulatedTextField: TextDocument {
     public private(set) var cursor: Int = 0
     /// marked textの範囲（Character単位）
     public private(set) var markedRange: Range<Int>?
+    /// 選択範囲（Character単位）。選択中は`cursor`が選択の先頭を指す。
+    public private(set) var selection: Range<Int>?
     /// 呼び出し履歴（テストで操作回数を確認するため）
     public private(set) var operationLog: [String] = []
 
@@ -51,16 +53,29 @@ public final class SimulatedTextField: TextDocument {
     }
 
     public var documentContextAfterInput: String? {
-        String(chars[cursor...])
+        String(chars[(selection?.upperBound ?? cursor)...])
     }
 
-    public var selectedText: String? { nil }
+    public var selectedText: String? {
+        guard let r = selection else { return nil }
+        return String(chars[r])
+    }
+
+    /// 選択範囲があれば取り除く（入力・削除で選択範囲が置き換わるUIKitの挙動）
+    private func removeSelection(_ c: inout [Character]) -> Bool {
+        guard let r = selection else { return false }
+        c.removeSubrange(r)
+        cursor = r.lowerBound
+        selection = nil
+        return true
+    }
 
     public var hasText: Bool { !text.isEmpty }
 
     public func insertText(_ insert: String) {
         operationLog.append("insert(\(insert))")
         var c = chars
+        _ = removeSelection(&c)
         if let r = markedRange {
             c.replaceSubrange(r, with: Array(insert))
             cursor = r.lowerBound + insert.count
@@ -75,6 +90,10 @@ public final class SimulatedTextField: TextDocument {
     public func deleteBackward() {
         operationLog.append("delete")
         var c = chars
+        if removeSelection(&c) {
+            text = String(c)
+            return
+        }
         if let r = markedRange {
             // UIKitではmarked textのカーソル直前を1文字消す
             guard cursor > r.lowerBound else { return }
@@ -92,6 +111,7 @@ public final class SimulatedTextField: TextDocument {
 
     public func adjustTextPosition(byCharacterOffset offset: Int) {
         operationLog.append("move(\(offset))")
+        selection = nil
         // UTF-16オフセットをCharacter単位に変換する
         let c = chars
         var remaining = offset
@@ -117,6 +137,7 @@ public final class SimulatedTextField: TextDocument {
     public func setMarkedText(_ marked: String, selectedRange: NSRange) {
         operationLog.append("mark(\(marked))")
         var c = chars
+        _ = removeSelection(&c)
         let start: Int
         if let r = markedRange {
             c.replaceSubrange(r, with: Array(marked))
@@ -148,7 +169,17 @@ public final class SimulatedTextField: TextDocument {
     /// ユーザーが別の場所をタップしたときなど、ホスト側でカーソルが動いた状況を再現する
     public func simulateUserTap(at position: Int) {
         markedRange = nil
+        selection = nil
         cursor = max(0, min(position, text.count))
+    }
+
+    /// ユーザーがテキストを選択した状況を再現する
+    public func simulateUserSelect(_ range: Range<Int>) {
+        markedRange = nil
+        let lower = max(0, min(range.lowerBound, text.count))
+        let upper = max(lower, min(range.upperBound, text.count))
+        selection = lower..<upper
+        cursor = lower
     }
 
     public func clearLog() {
@@ -160,6 +191,7 @@ public final class SimulatedTextField: TextDocument {
         text = ""
         cursor = 0
         markedRange = nil
+        selection = nil
         operationLog.removeAll()
     }
 }

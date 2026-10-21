@@ -25,8 +25,9 @@ public final class KeyboardRootView: UIView, UIInputViewAudioFeedback {
         self.keyboardView = keyboardView
         super.init(frame: .zero)
         backgroundColor = KeyboardTheme.background
-        addSubview(keyboardView)
+        // フリック先の吹き出しが候補バーの上に重なるよう、キー領域を手前に置く
         addSubview(candidateBar)
+        addSubview(keyboardView)
     }
 
     required init?(coder: NSCoder) {

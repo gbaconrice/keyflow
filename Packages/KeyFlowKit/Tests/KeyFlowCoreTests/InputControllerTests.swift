@@ -366,4 +366,56 @@ struct InputControllerTests {
         h.flick("あ")
         #expect(!h.controller.state.enterKeyDisabled)
     }
+
+    @Test("選択したテキストを再変換できる")
+    func reconvertSelection() {
+        let h = Harness(text: "x漢字y")
+        h.controller.readingProvider = { $0 == "漢字" ? "カンジ" : nil }
+        h.clock.advance(1)
+        h.field.simulateUserSelect(1..<3)
+        h.controller.documentDidChange()
+        #expect(h.controller.state.isReconverting)
+        #expect(h.candidates.first == "感じ")
+        #expect(!h.candidates.contains("漢字"))
+        h.controller.selectCandidate(at: 0, requestID: h.controller.state.candidateRequestID)
+        #expect(h.field.text == "x感じy")
+        #expect(!h.controller.state.isReconverting)
+        // 再変換の後も「取消」で読みに戻せる
+        #expect(h.controller.state.canUndoCommit)
+    }
+
+    @Test("ひらがなを選択したときは読みの推定なしで変換できる")
+    func reconvertHiragana() {
+        let h = Harness(text: "かんじ")
+        h.clock.advance(1)
+        h.field.simulateUserSelect(0..<3)
+        h.controller.documentDidChange()
+        #expect(h.candidates.contains("漢字"))
+    }
+
+    @Test("再変換の候補が出ている状態で文字を打つと、選択範囲が置き換わって通常の入力になる")
+    func typingDuringReconversion() {
+        let h = Harness(text: "かんじ")
+        h.clock.advance(1)
+        h.field.simulateUserSelect(0..<3)
+        h.controller.documentDidChange()
+        h.flick("あ")
+        #expect(h.field.text == "あ")
+        #expect(h.field.markedText == "あ")
+        #expect(!h.controller.state.isReconverting)
+    }
+
+    @Test("選択を解除すると再変換の候補が消える")
+    func deselectClearsReconversion() {
+        let h = Harness(text: "かんじ")
+        h.clock.advance(1)
+        h.field.simulateUserSelect(0..<3)
+        h.controller.documentDidChange()
+        #expect(h.controller.state.isReconverting)
+        h.clock.advance(1)
+        h.field.simulateUserTap(at: 3)
+        h.controller.documentDidChange()
+        #expect(!h.controller.state.isReconverting)
+        #expect(h.candidates.isEmpty)
+    }
 }

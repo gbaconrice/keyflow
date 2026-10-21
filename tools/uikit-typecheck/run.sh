@@ -23,6 +23,10 @@ for target, src in {"KeyFlowKeyboardUI": "Packages/KeyFlowKit/Sources/KeyFlowKey
     dst = os.path.join("Sources", target)
     os.makedirs(dst, exist_ok=True)
     for f in os.listdir(os.path.join(root, src)):
+        if f == "JapaneseReading.swift":
+            # CFStringTokenizerはLinuxに無いので、同じ形の代用品を置く
+            open(os.path.join(dst, f), "w").write("public enum JapaneseReading { public static func reading(of text: String) -> String? { nil } }\n")
+            continue
         if f.endswith(".swift"):
             s = open(os.path.join(root, src, f)).read().replace("@objc ", "")
             s = re.sub(r"#selector\(([^()]*(?:\([^()]*\))?)\)", r'Selector("\1")', s)

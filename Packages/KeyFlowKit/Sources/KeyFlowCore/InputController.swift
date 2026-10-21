@@ -68,6 +68,8 @@ public struct InputViewState: Sendable, Equatable {
     public var enterKeyDisabled = false
     public var shift: ShiftState = .off
     public var isToggleActive = false
+    /// 選択中のテキストの変換候補を表示している
+    public var isReconverting = false
 
     public init() {}
 }
@@ -101,6 +103,11 @@ public final class InputController {
     private var displayedPlainText = ""
     /// 自分で入力欄を操作した直後の状態（外部からの変更を見分けるため）
     private var expectedContext: (before: String?, after: String?, time: Date)?
+    /// 選択中のテキストを変換し直している（選択文字列とその読み）
+    private var reconversion: (selected: String, reading: String)?
+
+    /// 漢字を含む文字列の読み（ひらがな）を推定する。iOSではシステムの形態素解析を使う。
+    public var readingProvider: ((String) -> String?)?
 
     private struct ToggleState {
         var keyID: String
@@ -141,7 +148,7 @@ public final class InputController {
 
     /// フリックキー（かな・数字・記号）
     public func flick(keyID: String, spec: FlickKeySpec, direction: FlickDirection) {
-        verifyDocumentState()
+        beginKeyAction()
         guard let output = spec.output(for: direction) else {
             return
         }
@@ -181,7 +188,7 @@ public final class InputController {
 
     /// 文字キー（英字QWERTYなど）
     public func character(_ text: String) {
-        verifyDocumentState()
+        beginKeyAction()
         var output = text
         if mode == .english, shift != .off {
             output = text.uppercased()
@@ -195,7 +202,7 @@ public final class InputController {
 
     /// 「小゛゜」キー。centerは巡回、左は濁点、上は小文字、右は半濁点。
     public func modifier(direction: FlickDirection) {
-        verifyDocumentState()
+        beginKeyAction()
         toggle = nil
         if selectedIndex != nil {
             selectedIndex = nil
@@ -231,7 +238,7 @@ public final class InputController {
     }
 
     public func delete() {
-        verifyDocumentState()
+        beginKeyAction()
         toggle = nil
         if selectedIndex != nil {
             // 候補選択中は読みに戻す
@@ -256,7 +263,7 @@ public final class InputController {
     }
 
     public func space() {
-        verifyDocumentState()
+        beginKeyAction()
         toggle = nil
         if mode == .english || composition.isEmpty {
             let s = (mode == .english || settings.spaceWidth == .half) ? " " : "　"
@@ -279,7 +286,7 @@ public final class InputController {
     }
 
     public func enter() {
-        verifyDocumentState()
+        beginKeyAction()
         toggle = nil
         if selectedIndex != nil {
             commitSelectedCandidate(continueComposing: false)
@@ -300,7 +307,7 @@ public final class InputController {
 
     /// ◀キー。トグル入力中は1つ前の文字に戻す。
     public func cursorLeft() {
-        verifyDocumentState()
+        beginKeyAction()
         if var current = toggle, composition.textBeforeCursor.hasSuffix(current.current) {
             let previous = current.current
             current.index = (current.index - 1 + current.cycle.count) % current.cycle.count
@@ -318,7 +325,7 @@ public final class InputController {
 
     /// ▶キー。トグル入力中は入力中の文字を確定させ、次の連打を新しい文字にする（標準キーボードの「→」と同じ）。
     public func cursorRight() {
-        verifyDocumentState()
+        beginKeyAction()
         if toggle != nil {
             toggle = nil
             rebuildState()
@@ -329,7 +336,7 @@ public final class InputController {
 
     /// カーソル移動（空白キーのドラッグなど）。入力中は入力中の文字列の中で動かす。
     public func moveCursor(by offset: Int) {
-        verifyDocumentState()
+        beginKeyAction()
         toggle = nil
         guard offset != 0 else { return }
         if !composition.isEmpty {
@@ -389,13 +396,24 @@ public final class InputController {
             rebuildState()
             return
         }
+        if composition.isEmpty, let reconversion, let document {
+            // 選択中のテキストを候補で置き換える
+            document.insertText(candidate.text)
+            recordExpectedContext()
+            conversion.commit(candidate, of: candidateList, remaining: "", options: conversionOptions)
+            self.reconversion = nil
+            candidateList = .empty
+            lastCommit = (candidate.text, reconversion.reading)
+            rebuildState()
+            return
+        }
         guard !composition.isEmpty else { return }
         commit(candidate: candidate, continueComposing: false)
     }
 
     /// 直前に確定した文字列を読みに戻す（変換し直すため）
     public func undoLastCommit() {
-        verifyDocumentState()
+        beginKeyAction()
         guard composition.isEmpty, let commit = lastCommit, let document,
               let before = document.documentContextBeforeInput, before.hasSuffix(commit.text) else {
             lastCommit = nil
@@ -430,14 +448,43 @@ public final class InputController {
             return
         }
         if composition.isEmpty && displayedPlainText.isEmpty {
-            // 入力中でなければ、予測候補と「取消」を消すだけ
+            // 入力中でなければ、予測候補と「取消」を消し、テキストが選択されていれば再変換の候補を出す
             clearIdleCandidates()
             lastCommit = nil
             updateAutoShift()
+            updateReconversion()
             rebuildState()
             return
         }
         abandonComposition()
+    }
+
+    /// 選択中のテキストの読みを推定し、変換候補を出す
+    private func updateReconversion() {
+        reconversion = nil
+        guard settings.reconversionEnabled, let document, let selected = document.selectedText, !selected.isEmpty,
+              selected.count <= 30, !selected.contains(where: { $0.isNewline }),
+              let reading = reading(for: selected), !reading.isEmpty, reading.count <= 40 else {
+            return
+        }
+        reconversion = (selected, reading)
+        conversion.request(source: reading, options: conversionOptions)
+    }
+
+    private func reading(for text: String) -> String? {
+        if text.allSatisfy({ $0.isHiraganaForReading }) {
+            return text
+        }
+        if text.allSatisfy({ $0.isKatakanaForReading }) {
+            return text.katakanaToHiragana
+        }
+        return readingProvider?(text)?.katakanaToHiragana
+    }
+
+    /// キー操作の始めに呼ぶ
+    private func beginKeyAction() {
+        reconversion = nil
+        verifyDocumentState()
     }
 
     /// キー入力の前に、入力欄が想定どおりの状態かを確かめる。
@@ -589,6 +636,15 @@ public final class InputController {
     }
 
     private func receive(_ list: CandidateList) {
+        if composition.isEmpty, let reconversion {
+            guard list.source == reconversion.reading else { return }
+            // 選択範囲全体を置き換えるので、読み全体を変換した候補だけを使う
+            var filtered = list
+            filtered.candidates = list.candidates.filter { $0.consumedCount == reconversion.reading.count && $0.text != reconversion.selected }
+            candidateList = filtered
+            rebuildState()
+            return
+        }
         if composition.isEmpty {
             // 次の語の予測（入力中でない時だけ表示）
             guard settings.nextWordPredictionEnabled, list.source.isEmpty else { return }
@@ -744,7 +800,8 @@ public final class InputController {
         s.candidates = candidateList.candidates
         s.candidateRequestID = candidateList.requestID
         s.selectedCandidateIndex = selectedIndex
-        s.canUndoCommit = lastCommit != nil && composition.isEmpty
+        s.canUndoCommit = lastCommit != nil && composition.isEmpty && reconversion == nil
+        s.isReconverting = reconversion != nil && !candidateList.candidates.isEmpty
         s.shift = shift
         s.isToggleActive = toggle != nil
         if mode == .english {
@@ -761,5 +818,27 @@ public final class InputController {
         s.enterKeyDisabled = !s.isComposing && enablesReturnKeyAutomatically && !(document?.hasText ?? true)
         state = s
         onStateChange?(s)
+    }
+}
+
+extension Character {
+    var isHiraganaForReading: Bool {
+        unicodeScalars.allSatisfy { (0x3041...0x3096).contains($0.value) || $0.value == 0x30FC }
+    }
+
+    var isKatakanaForReading: Bool {
+        unicodeScalars.allSatisfy { (0x30A1...0x30F6).contains($0.value) || $0.value == 0x30FC }
+    }
+}
+
+extension String {
+    /// カタカナをひらがなにする（長音・その他の文字はそのまま）
+    var katakanaToHiragana: String {
+        String(String.UnicodeScalarView(unicodeScalars.map { scalar in
+            if (0x30A1...0x30F6).contains(scalar.value), let h = Unicode.Scalar(scalar.value - 0x60) {
+                return h
+            }
+            return scalar
+        }))
     }
 }

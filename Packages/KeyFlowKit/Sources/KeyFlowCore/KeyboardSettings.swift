@@ -59,6 +59,8 @@ public struct KeyboardSettings: Codable, Sendable, Equatable {
     public var toggleTimeout: Double = 0
     /// 押下中にフリック先の文字を表示する
     public var showsFlickGuide: Bool = true
+    /// キーの上下左右にフリック先の文字を小さく表示する
+    public var showsKeyHints: Bool = false
     /// 空白キーで入れるスペース
     public var spaceWidth: SpaceWidth = .half
     /// 入力中の文字列に下線を付けて表示する（marked text）。
@@ -88,6 +90,8 @@ public struct KeyboardSettings: Codable, Sendable, Equatable {
     public var nextWordPredictionEnabled: Bool = true
     /// 絵文字を候補に含める
     public var emojiCandidates: Bool = true
+    /// テキストを選択したときに変換し直す候補を出す
+    public var reconversionEnabled: Bool = true
 
     /// 設定を最後に変更した時刻（アプリとキーボード内で変更した値のどちらが新しいかの判定に使う）
     public var updatedAt: Date = .distantPast
@@ -146,10 +150,10 @@ public struct KeyboardSettings: Codable, Sendable, Equatable {
         case portraitKeyAreaHeight, landscapeKeyAreaHeight, candidateBarHeight
         case horizontalKeySpacing, verticalKeySpacing, sideMargin, bottomMargin, sideColumnRatio
         case oneHandedMode, oneHandedWidthRatio, landscapeWidthRatio, keyCornerRadius, kanaFontSize, candidateFontSize
-        case flickThreshold, toggleInputEnabled, toggleTimeout, showsFlickGuide, spaceWidth, usesMarkedText
+        case flickThreshold, toggleInputEnabled, toggleTimeout, showsFlickGuide, showsKeyHints, spaceWidth, usesMarkedText
         case englishAutoCapitalization, deleteRepeatDelay, cursorDragStep
         case hapticFeedback, keySound
-        case learningEnabled, predictionEnabled, nextWordPredictionEnabled, emojiCandidates
+        case learningEnabled, predictionEnabled, nextWordPredictionEnabled, emojiCandidates, reconversionEnabled
         case updatedAt
     }
 
@@ -177,6 +181,7 @@ public struct KeyboardSettings: Codable, Sendable, Equatable {
         toggleInputEnabled = v(.toggleInputEnabled, d.toggleInputEnabled)
         toggleTimeout = v(.toggleTimeout, d.toggleTimeout)
         showsFlickGuide = v(.showsFlickGuide, d.showsFlickGuide)
+        showsKeyHints = v(.showsKeyHints, d.showsKeyHints)
         spaceWidth = v(.spaceWidth, d.spaceWidth)
         usesMarkedText = v(.usesMarkedText, d.usesMarkedText)
         englishAutoCapitalization = v(.englishAutoCapitalization, d.englishAutoCapitalization)
@@ -188,6 +193,7 @@ public struct KeyboardSettings: Codable, Sendable, Equatable {
         predictionEnabled = v(.predictionEnabled, d.predictionEnabled)
         nextWordPredictionEnabled = v(.nextWordPredictionEnabled, d.nextWordPredictionEnabled)
         emojiCandidates = v(.emojiCandidates, d.emojiCandidates)
+        reconversionEnabled = v(.reconversionEnabled, d.reconversionEnabled)
         updatedAt = v(.updatedAt, d.updatedAt)
     }
 
@@ -211,6 +217,7 @@ public struct KeyboardSettings: Codable, Sendable, Equatable {
         try c.encode(toggleInputEnabled, forKey: .toggleInputEnabled)
         try c.encode(toggleTimeout, forKey: .toggleTimeout)
         try c.encode(showsFlickGuide, forKey: .showsFlickGuide)
+        try c.encode(showsKeyHints, forKey: .showsKeyHints)
         try c.encode(spaceWidth, forKey: .spaceWidth)
         try c.encode(usesMarkedText, forKey: .usesMarkedText)
         try c.encode(englishAutoCapitalization, forKey: .englishAutoCapitalization)
@@ -222,6 +229,7 @@ public struct KeyboardSettings: Codable, Sendable, Equatable {
         try c.encode(predictionEnabled, forKey: .predictionEnabled)
         try c.encode(nextWordPredictionEnabled, forKey: .nextWordPredictionEnabled)
         try c.encode(emojiCandidates, forKey: .emojiCandidates)
+        try c.encode(reconversionEnabled, forKey: .reconversionEnabled)
         try c.encode(updatedAt, forKey: .updatedAt)
     }
 }

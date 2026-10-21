@@ -120,6 +120,8 @@ public final class KeyboardView: UIView {
         }
         if layoutChanged {
             geometry = nil
+            renderedSignatures.removeAll()
+            refreshDynamicKeys()
             setNeedsLayout()
         }
     }
@@ -128,8 +130,8 @@ public final class KeyboardView: UIView {
         guard state != self.state else { return }
         self.state = state
         refreshDynamicKeys()
-        if let geometry {
-            rebuildAccessibilityElements(geometry)
+        for key in spec.keys {
+            elementsByID[key.id]?.accessibilityLabel = accessibilityName(for: key)
         }
     }
 
@@ -143,6 +145,8 @@ public final class KeyboardView: UIView {
             insertSubview(view, at: 0)
             keyViews[key.id] = view
         }
+        globeButton.isHidden = !spec.keys.contains { $0.kind == .nextKeyboard }
+        renderedSignatures.removeAll()
         refreshDynamicKeys()
         rebuildOneHandedBar()
     }
@@ -186,6 +190,7 @@ public final class KeyboardView: UIView {
     }
 
     private var keyElements: [Any] = []
+    private var elementsByID: [String: UIAccessibilityElement] = [:]
 
     public override var accessibilityElements: [Any]? {
         get { keyElements }
@@ -210,6 +215,7 @@ public final class KeyboardView: UIView {
 
     private func rebuildAccessibilityElements(_ geometry: KeyboardGeometry) {
         var elements: [Any] = []
+        elementsByID.removeAll()
         for key in geometry.keys {
             if case .nextKeyboard = key.definition.kind {
                 continue
@@ -223,6 +229,7 @@ public final class KeyboardView: UIView {
                 self?.activateByAccessibility(key)
             }
             elements.append(element)
+            elementsByID[key.definition.id] = element
         }
         if !globeButton.isHidden {
             elements.append(globeButton)
@@ -256,51 +263,76 @@ public final class KeyboardView: UIView {
         }
     }
 
-    /// 入力状態によって表示が変わるキーを更新する
-    private func refreshDynamicKeys() {
+    /// キーごとに最後に描いた内容。変わったキーだけ描き直す（打鍵ごとに全キーを更新しないため）
+    private var renderedSignatures: [String: String] = [:]
+
+    private struct KeyAppearance {
+        var title: String?
+        var systemImage: String?
+        var fontSize: CGFloat
+        var style: KeyCapView.Style
+        var hints: [FlickDirection: String] = [:]
+        var subtitle: String?
+        var enabled = true
+
+        var signature: String {
+            let h = hints.keys.sorted { $0.rawValue < $1.rawValue }.map { "\($0.rawValue)\(hints[$0] ?? "")" }.joined()
+            return "\(title ?? "")|\(systemImage ?? "")|\(fontSize)|\(style)|\(h)|\(subtitle ?? "")|\(enabled)"
+        }
+    }
+
+    private func appearance(for key: KeyDefinition) -> KeyAppearance {
         let fontSize = CGFloat(settings.kanaFontSize)
         let functionalFont = min(fontSize * 0.75, 17)
+        switch key.kind {
+        case let .flick(flickSpec):
+            var hints: [FlickDirection: String] = [:]
+            if settings.showsKeyHints, flickSpec.subLabel == nil, flickSpec.label.count == 1 {
+                for d in [FlickDirection.left, .up, .right, .down] {
+                    hints[d] = flickSpec.outputs[d]
+                }
+            }
+            return KeyAppearance(title: flickSpec.label, fontSize: flickSpec.label.count > 2 ? fontSize * 0.75 : fontSize, style: .normal, hints: hints, subtitle: flickSpec.subLabel)
+        case let .character(text):
+            let shown = (spec.mode == .english && state.shift != .off) ? text.uppercased() : text
+            return KeyAppearance(title: shown, fontSize: fontSize, style: .normal)
+        case .modifier:
+            return KeyAppearance(title: "小゛゜", fontSize: fontSize * 0.75, style: .normal)
+        case .delete:
+            return KeyAppearance(systemImage: "delete.left", fontSize: fontSize, style: .functional)
+        case .space:
+            return KeyAppearance(title: state.spaceKeyLabel, fontSize: functionalFont, style: spec.mode == .english ? .normal : .functional)
+        case .enter:
+            return KeyAppearance(title: state.enterKeyLabel, fontSize: functionalFont, style: state.enterKeyEmphasized ? .accent : .functional, enabled: !state.enterKeyDisabled)
+        case .cursorLeft:
+            return KeyAppearance(systemImage: state.isToggleActive ? "arrow.uturn.backward" : "chevron.left", fontSize: fontSize, style: .functional)
+        case .cursorRight:
+            return KeyAppearance(systemImage: state.isToggleActive ? "arrow.right" : "chevron.right", fontSize: fontSize, style: .functional)
+        case .shift:
+            let image: String
+            switch state.shift {
+            case .off: image = "shift"
+            case .once: image = "shift.fill"
+            case .locked: image = "capslock.fill"
+            }
+            return KeyAppearance(systemImage: image, fontSize: fontSize, style: state.shift == .off ? .functional : .normal)
+        case let .switchMode(target):
+            return KeyAppearance(title: label(for: target), fontSize: functionalFont, style: .functional)
+        case .nextKeyboard:
+            return KeyAppearance(systemImage: "globe", fontSize: fontSize, style: .functional)
+        }
+    }
+
+    /// 入力状態によって表示が変わるキーを更新する
+    private func refreshDynamicKeys() {
         for key in spec.keys {
             guard let view = keyViews[key.id] else { continue }
-            switch key.kind {
-            case let .flick(flickSpec):
-                var hints: [FlickDirection: String] = [:]
-                if flickSpec.subLabel == nil, flickSpec.label.count == 1 {
-                    for d in [FlickDirection.left, .up, .right, .down] {
-                        hints[d] = flickSpec.outputs[d]
-                    }
-                }
-                view.configure(title: flickSpec.label, fontSize: flickSpec.label.count > 2 ? fontSize * 0.75 : fontSize, style: .normal, hints: hints, subtitle: flickSpec.subLabel)
-            case let .character(text):
-                let shown = (spec.mode == .english && state.shift != .off) ? text.uppercased() : text
-                view.configure(title: shown, fontSize: fontSize, style: .normal)
-            case .modifier:
-                view.configure(title: "小゛゜", fontSize: fontSize * 0.75, style: .normal)
-            case .delete:
-                view.configure(title: nil, systemImage: "delete.left", fontSize: fontSize, style: .functional)
-            case .space:
-                view.configure(title: state.spaceKeyLabel, fontSize: functionalFont, style: spec.mode == .english ? .normal : .functional)
-            case .enter:
-                view.configure(title: state.enterKeyLabel, fontSize: functionalFont, style: state.enterKeyEmphasized ? .accent : .functional)
-                view.isEnabled = !state.enterKeyDisabled
-            case .cursorLeft:
-                view.configure(title: nil, systemImage: state.isToggleActive ? "arrow.uturn.backward" : "chevron.left", fontSize: fontSize, style: .functional)
-            case .cursorRight:
-                view.configure(title: nil, systemImage: state.isToggleActive ? "arrow.right" : "chevron.right", fontSize: fontSize, style: .functional)
-            case .shift:
-                let image: String
-                switch state.shift {
-                case .off: image = "shift"
-                case .once: image = "shift.fill"
-                case .locked: image = "capslock.fill"
-                }
-                view.configure(title: nil, systemImage: image, fontSize: fontSize, style: state.shift == .off ? .functional : .normal)
-            case let .switchMode(target):
-                view.configure(title: label(for: target), fontSize: functionalFont, style: .functional)
-            case .nextKeyboard:
-                view.configure(title: nil, systemImage: "globe", fontSize: fontSize, style: .functional)
-                globeButton.isHidden = false
-            }
+            let a = appearance(for: key)
+            let signature = a.signature
+            guard renderedSignatures[key.id] != signature else { continue }
+            renderedSignatures[key.id] = signature
+            view.configure(title: a.title, systemImage: a.systemImage, fontSize: a.fontSize, style: a.style, hints: a.hints, subtitle: a.subtitle)
+            view.isEnabled = a.enabled
         }
     }
 
@@ -422,6 +454,7 @@ public final class KeyboardView: UIView {
                 ts.isDraggingCursor = true
                 ts.dragAnchorX = ts.current.x
                 self.keyViews[ts.key.definition.id]?.configure(title: "◀︎ カーソル ▶︎", fontSize: 14, style: .functional)
+                self.renderedSignatures[ts.key.definition.id] = nil
             }
         case let .flick(spec):
             if settings.showsFlickGuide {
@@ -460,6 +493,7 @@ public final class KeyboardView: UIView {
                 ts.holdTimer?.invalidate()
                 ts.dragAnchorX = ts.current.x
                 keyViews[ts.key.definition.id]?.configure(title: "◀︎ カーソル ▶︎", fontSize: 14, style: .functional)
+                renderedSignatures[ts.key.definition.id] = nil
             }
             if ts.isDraggingCursor {
                 let steps = Int((ts.current.x - ts.dragAnchorX) / step)

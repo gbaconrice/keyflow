@@ -52,6 +52,7 @@ final class KeyboardViewController: UIInputViewController {
 
         let controller = InputController(settings: settings, conversion: conversion)
         controller.document = ProxyTextDocument(inputViewController: self)
+        controller.readingProvider = { JapaneseReading.reading(of: $0) }
         let session = KeyboardSession(controller: controller, settings: settings)
         session.onSettingsChange = { [weak self] s in
             self?.store?.saveLocalSettings(s)

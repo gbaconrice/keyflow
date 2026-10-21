@@ -62,6 +62,8 @@ public final class CandidateBarView: UIView {
     private let dismissButton = UIButton(type: .system)
     private let undoButton = UIButton(type: .system)
     private let separator = UIView()
+    /// 選択中のテキストを変換し直していることを示すラベル
+    private let reconversionLabel = UILabel()
     public var fontSize: CGFloat = 17 {
         didSet { if oldValue != fontSize { setNeedsLayout() } }
     }
@@ -98,6 +100,12 @@ public final class CandidateBarView: UIView {
 
         separator.backgroundColor = KeyboardTheme.separator
         addSubview(separator)
+
+        reconversionLabel.text = "再変換"
+        reconversionLabel.font = .systemFont(ofSize: 12, weight: .medium)
+        reconversionLabel.textColor = KeyboardTheme.secondaryLabel
+        reconversionLabel.isHidden = true
+        addSubview(reconversionLabel)
     }
 
     required init?(coder: NSCoder) {
@@ -111,6 +119,7 @@ public final class CandidateBarView: UIView {
         let selectionChanged = state.selectedCandidateIndex != selectedIndex
         selectedIndex = state.selectedCandidateIndex
         undoButton.isHidden = !state.canUndoCommit
+        reconversionLabel.isHidden = !state.isReconverting
         if changed {
             reloadCells()
             scrollView.setContentOffset(.zero, animated: false)
@@ -171,6 +180,11 @@ public final class CandidateBarView: UIView {
             right -= buttonWidth
         }
         var left: CGFloat = 4
+        if !reconversionLabel.isHidden {
+            let size = reconversionLabel.sizeThatFits(CGSize(width: 80, height: h))
+            reconversionLabel.frame = CGRect(x: left + 4, y: (h - size.height) / 2, width: size.width, height: size.height)
+            left += size.width + 10
+        }
         if !undoButton.isHidden {
             let size = undoButton.sizeThatFits(CGSize(width: 120, height: h))
             undoButton.frame = CGRect(x: left, y: (h - size.height) / 2, width: size.width, height: size.height)

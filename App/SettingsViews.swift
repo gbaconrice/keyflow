@@ -105,7 +105,8 @@ struct InputSettingsView: View {
         PreviewedSettings(title: "入力操作") {
             Section {
                 SliderRow(title: "フリックの判定距離", value: $model.settings.flickThreshold, range: KeyboardSettings.Ranges.flickThreshold) { "\(Int($0.rounded())) pt" }
-                Toggle("フリック先の文字を表示", isOn: $model.settings.showsFlickGuide)
+                Toggle("押している間、フリック先の文字を表示", isOn: $model.settings.showsFlickGuide)
+                Toggle("キーの四隅にフリック先の文字を表示", isOn: $model.settings.showsKeyHints)
             } header: {
                 Text("フリック")
             } footer: {
@@ -171,10 +172,11 @@ struct ConversionSettingsView: View {
                 Toggle("予測変換", isOn: $model.settings.predictionEnabled)
                 Toggle("確定後に次の語を予測", isOn: $model.settings.nextWordPredictionEnabled)
                 Toggle("絵文字を候補に出す", isOn: $model.settings.emojiCandidates)
+                Toggle("選択したテキストを変換し直す", isOn: $model.settings.reconversionEnabled)
             } header: {
                 Text("候補")
             } footer: {
-                Text("「変換」キーは予測候補を飛ばし、入力した読みの変換候補だけを順に選びます。")
+                Text("「変換」キーは予測候補を飛ばし、入力した読みの変換候補だけを順に選びます。テキストを選択すると、候補バーに変換し直す候補が出ます。")
             }
             Section {
                 Toggle("確定した候補を学習する", isOn: $model.settings.learningEnabled)
