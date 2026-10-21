@@ -10,6 +10,7 @@ import KeyFlowEngine
 // - 最後まで打った時点で、「変換」キーで選べる候補（予測を除く）の何位に正解があるかを数える
 // - 1回正解を確定した後にもう一度変換し、学習で順位が上がるかを確かめる
 
+#if os(Linux) || os(macOS)
 struct Row {
     let reading: String
     let answers: [String]
@@ -129,3 +130,7 @@ print(String(format: "- プロセスの最大メモリ使用量: %.1f MB", peakM
 print("\n## 1位で正解しなかった例\n")
 misses.forEach { print($0) }
 try? FileManager.default.removeItem(at: memory)
+#else
+// iOSなどでは使わない（パッケージ全体をビルドするときのために空の実行ファイルにする）
+print("KeyFlowEval runs on Linux or macOS")
+#endif
