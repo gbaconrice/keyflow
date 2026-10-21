@@ -1,0 +1,10 @@
+.build/
+.swiftpm/
+DerivedData/
+build/
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+*.ipa
+.DS_Store
+Packages/KeyFlowKit/Package.resolved
