@@ -111,6 +111,8 @@ open class UIView: UIResponder {
     open var accessibilityLabel: String?
     open var accessibilityIdentifier: String?
     open var accessibilityElements: [Any]?
+    open var tag = 0
+    open var intrinsicContentSize: CGSize { .zero }
     open var widthAnchor: NSLayoutDimension { NSLayoutDimension() }
     open var heightAnchor: NSLayoutDimension { NSLayoutDimension() }
     open var leadingAnchor: NSLayoutXAxisAnchor { NSLayoutXAxisAnchor() }
@@ -182,6 +184,7 @@ open class UIButton: UIControl {
     open var titleLabel: UILabel?
     open func setImage(_ image: UIImage?, for state: UIControlState) {}
     open func setTitle(_ title: String?, for state: UIControlState) {}
+    open func setTitleColor(_ color: UIColor?, for state: UIControlState) {}
 }
 open class UIScrollView: UIView {
     open var showsHorizontalScrollIndicator = true

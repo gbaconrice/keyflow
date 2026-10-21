@@ -68,6 +68,8 @@ public struct KeyboardSettings: Codable, Sendable, Equatable {
     public var usesMarkedText: Bool = true
     /// 英字入力で文頭を大文字にする
     public var englishAutoCapitalization: Bool = false
+    /// 英字の配列
+    public var englishLayout: EnglishLayout = .qwerty
     /// 削除キー長押しの連続削除が始まるまでの時間（秒）
     public var deleteRepeatDelay: Double = 0.45
     /// 空白キーを横にドラッグしたときのカーソル移動1文字あたりの距離（pt）
@@ -151,7 +153,7 @@ public struct KeyboardSettings: Codable, Sendable, Equatable {
         case horizontalKeySpacing, verticalKeySpacing, sideMargin, bottomMargin, sideColumnRatio
         case oneHandedMode, oneHandedWidthRatio, landscapeWidthRatio, keyCornerRadius, kanaFontSize, candidateFontSize
         case flickThreshold, toggleInputEnabled, toggleTimeout, showsFlickGuide, showsKeyHints, spaceWidth, usesMarkedText
-        case englishAutoCapitalization, deleteRepeatDelay, cursorDragStep
+        case englishAutoCapitalization, englishLayout, deleteRepeatDelay, cursorDragStep
         case hapticFeedback, keySound
         case learningEnabled, predictionEnabled, nextWordPredictionEnabled, emojiCandidates, reconversionEnabled
         case updatedAt
@@ -185,6 +187,7 @@ public struct KeyboardSettings: Codable, Sendable, Equatable {
         spaceWidth = v(.spaceWidth, d.spaceWidth)
         usesMarkedText = v(.usesMarkedText, d.usesMarkedText)
         englishAutoCapitalization = v(.englishAutoCapitalization, d.englishAutoCapitalization)
+        englishLayout = v(.englishLayout, d.englishLayout)
         deleteRepeatDelay = v(.deleteRepeatDelay, d.deleteRepeatDelay)
         cursorDragStep = v(.cursorDragStep, d.cursorDragStep)
         hapticFeedback = v(.hapticFeedback, d.hapticFeedback)
@@ -221,6 +224,7 @@ public struct KeyboardSettings: Codable, Sendable, Equatable {
         try c.encode(spaceWidth, forKey: .spaceWidth)
         try c.encode(usesMarkedText, forKey: .usesMarkedText)
         try c.encode(englishAutoCapitalization, forKey: .englishAutoCapitalization)
+        try c.encode(englishLayout, forKey: .englishLayout)
         try c.encode(deleteRepeatDelay, forKey: .deleteRepeatDelay)
         try c.encode(cursorDragStep, forKey: .cursorDragStep)
         try c.encode(hapticFeedback, forKey: .hapticFeedback)

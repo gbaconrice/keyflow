@@ -56,6 +56,15 @@ public enum KeyKind: Sendable, Equatable {
     case switchMode(KeyboardMode)
     /// 地球儀キー（ホームボタン搭載機など、システムが切替キーを出さない場合のみ表示）
     case nextKeyboard
+    /// 直前の英字の大文字・小文字を切り替える（英字12キーの「a/A」）
+    case caseToggle
+}
+
+/// 英字の配列
+public enum EnglishLayout: String, Codable, Sendable, CaseIterable {
+    case qwerty
+    /// 12キーのフリック（標準キーボードの英字テンキーと同じ割り当て）
+    case flick
 }
 
 /// キーの配置。グリッド上の列・行と幅・高さ（列数・行数）で表す。
@@ -252,11 +261,60 @@ public enum KeyboardLayouts {
         ]
     }
 
-    public static func layout(for mode: KeyboardMode, showsGlobeKey: Bool) -> KeyboardLayoutSpec {
+    /// 英字の12キー配列
+    ///
+    /// ```
+    /// [◀] [@#/&_] [ABC] [DEF]    [⌫]
+    /// [▶] [GHI]   [JKL] [MNO]    [space]
+    /// [あいう][PQRS] [TUV] [WXYZ]  [改行]
+    /// [123][a/A]  ['"()] [.,?!] [改行]
+    /// ```
+    public static func englishFlick(showsGlobeKey: Bool, sideColumnWeight: Double = 0.86) -> KeyboardLayoutSpec {
+        func letters(_ chars: [String]) -> KeyKind {
+            var outputs: [FlickDirection: String] = [:]
+            for (direction, c) in zip([FlickDirection.center, .left, .up, .right, .down], chars) {
+                outputs[direction] = c
+            }
+            return .flick(FlickKeySpec(label: chars.joined().uppercased(), outputs: outputs, toggleCycle: chars))
+        }
+        var keys: [KeyDefinition] = [
+            .init(id: "cursorLeft", kind: .cursorLeft, placement: .init(column: 0, row: 0), isFunctional: true),
+            .init(id: "cursorRight", kind: .cursorRight, placement: .init(column: 0, row: 1), isFunctional: true),
+            .init(id: "e_at", kind: .flick(FlickKeySpec(label: "@#/&_", outputs: [.center: "@", .left: "#", .up: "/", .right: "&", .down: "_"], toggleCycle: ["@", "#", "/", "&", "_"])), placement: .init(column: 1, row: 0)),
+            .init(id: "e_abc", kind: letters(["a", "b", "c"]), placement: .init(column: 2, row: 0)),
+            .init(id: "e_def", kind: letters(["d", "e", "f"]), placement: .init(column: 3, row: 0)),
+            .init(id: "e_ghi", kind: letters(["g", "h", "i"]), placement: .init(column: 1, row: 1)),
+            .init(id: "e_jkl", kind: letters(["j", "k", "l"]), placement: .init(column: 2, row: 1)),
+            .init(id: "e_mno", kind: letters(["m", "n", "o"]), placement: .init(column: 3, row: 1)),
+            .init(id: "e_pqrs", kind: letters(["p", "q", "r", "s"]), placement: .init(column: 1, row: 2)),
+            .init(id: "e_tuv", kind: letters(["t", "u", "v"]), placement: .init(column: 2, row: 2)),
+            .init(id: "e_wxyz", kind: letters(["w", "x", "y", "z"]), placement: .init(column: 3, row: 2)),
+            .init(id: "caseToggle", kind: .caseToggle, placement: .init(column: 1, row: 3)),
+            .init(id: "e_quote", kind: .flick(FlickKeySpec(label: "'\"()", outputs: [.center: "'", .left: "\"", .up: "(", .right: ")"], toggleCycle: ["'", "\"", "(", ")"])), placement: .init(column: 2, row: 3)),
+            .init(id: "e_punct", kind: .flick(FlickKeySpec(label: ".,?!", outputs: [.center: ".", .left: ",", .up: "?", .right: "!"], toggleCycle: [".", ",", "?", "!"])), placement: .init(column: 3, row: 3)),
+            .init(id: "delete", kind: .delete, placement: .init(column: 4, row: 0), isFunctional: true),
+            .init(id: "space", kind: .space, placement: .init(column: 4, row: 1), isFunctional: true),
+            .init(id: "enter", kind: .enter, placement: .init(column: 4, row: 2, height: 2), isFunctional: true),
+        ]
+        if showsGlobeKey {
+            keys.append(.init(id: "modeCycle", kind: .switchMode(.number), placement: .init(column: 0, row: 2), isFunctional: true))
+            keys.append(.init(id: "globe", kind: .nextKeyboard, placement: .init(column: 0, row: 3), isFunctional: true))
+        } else {
+            keys.append(.init(id: "toKana", kind: .switchMode(.kana), placement: .init(column: 0, row: 2), isFunctional: true))
+            keys.append(.init(id: "toNumber", kind: .switchMode(.number), placement: .init(column: 0, row: 3), isFunctional: true))
+        }
+        return KeyboardLayoutSpec(mode: .english, columnWeights: [sideColumnWeight, 1, 1, 1, sideColumnWeight], rowCount: 4, keys: keys)
+    }
+
+    public static func layout(for mode: KeyboardMode, showsGlobeKey: Bool, englishLayout: EnglishLayout = .qwerty, sideColumnWeight: Double = 0.86) -> KeyboardLayoutSpec {
         switch mode {
-        case .kana: return kana(showsGlobeKey: showsGlobeKey)
-        case .number: return number(showsGlobeKey: showsGlobeKey)
-        case .english: return english(showsGlobeKey: showsGlobeKey)
+        case .kana: return kana(showsGlobeKey: showsGlobeKey, sideColumnWeight: sideColumnWeight)
+        case .number: return number(showsGlobeKey: showsGlobeKey, sideColumnWeight: sideColumnWeight)
+        case .english:
+            switch englishLayout {
+            case .qwerty: return english(showsGlobeKey: showsGlobeKey)
+            case .flick: return englishFlick(showsGlobeKey: showsGlobeKey, sideColumnWeight: sideColumnWeight)
+            }
         }
     }
 }

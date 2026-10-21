@@ -85,6 +85,26 @@ struct LayoutEngineTests {
         }
     }
 
+    @Test("すべての配列で、キーが重ならず幅に収まる", arguments: [
+        KeyboardLayouts.kana(showsGlobeKey: true),
+        KeyboardLayouts.number(showsGlobeKey: false),
+        KeyboardLayouts.number(showsGlobeKey: true),
+        KeyboardLayouts.englishFlick(showsGlobeKey: false),
+        KeyboardLayouts.englishFlick(showsGlobeKey: true),
+        KeyboardLayouts.english(showsGlobeKey: false),
+    ])
+    func allLayoutsFit(spec: KeyboardLayoutSpec) {
+        let g = LayoutEngine.layout(spec, context: .init(width: width, isLandscape: false, settings: .default))
+        let ids = spec.keys.map(\.id)
+        #expect(Set(ids).count == ids.count, "キーIDが重複している")
+        for a in g.keys {
+            #expect(a.frame.minX >= 0 && a.frame.maxX <= width + 0.5)
+            for b in g.keys where a.definition.id != b.definition.id {
+                #expect(!a.frame.intersects(b.frame), "\(a.definition.id) と \(b.definition.id) が重なっている")
+            }
+        }
+    }
+
     @Test("キー間の隙間に触れても最寄りのキーが反応する")
     func gapsAreCovered() {
         let spec = KeyboardLayouts.kana(showsGlobeKey: false)

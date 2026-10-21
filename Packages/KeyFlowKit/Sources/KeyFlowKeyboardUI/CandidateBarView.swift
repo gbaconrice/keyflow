@@ -8,6 +8,7 @@ public protocol CandidateBarDelegate: AnyObject {
     func candidateBarDidTapExpand(_ bar: CandidateBarView)
     func candidateBarDidTapSettings(_ bar: CandidateBarView)
     func candidateBarDidTapDismiss(_ bar: CandidateBarView)
+    func candidateBarDidTapSymbols(_ bar: CandidateBarView)
 }
 
 /// 候補1つ分のボタン
@@ -60,6 +61,7 @@ public final class CandidateBarView: UIView {
     private let expandButton = UIButton(type: .system)
     private let settingsButton = UIButton(type: .system)
     private let dismissButton = UIButton(type: .system)
+    private let symbolsButton = UIButton(type: .system)
     private let undoButton = UIButton(type: .system)
     private let separator = UIView()
     /// 選択中のテキストを変換し直していることを示すラベル
@@ -86,6 +88,7 @@ public final class CandidateBarView: UIView {
         setup(expandButton, "chevron.down", "候補をすべて表示", #selector(tapExpand))
         setup(settingsButton, "slider.horizontal.3", "キーボードの調整", #selector(tapSettings))
         setup(dismissButton, "keyboard.chevron.compact.down", "キーボードを閉じる", #selector(tapDismiss))
+        setup(symbolsButton, "face.smiling", "記号と顔文字", #selector(tapSymbols))
 
         var config = UIButton.Configuration.plain()
         config.image = UIImage(systemName: "arrow.uturn.backward", withConfiguration: UIImage.SymbolConfiguration(pointSize: 13, weight: .medium))
@@ -168,6 +171,7 @@ public final class CandidateBarView: UIView {
         expandButton.isHidden = !hasCandidates
         settingsButton.isHidden = hasCandidates
         dismissButton.isHidden = hasCandidates
+        symbolsButton.isHidden = hasCandidates
 
         var right = bounds.width
         if hasCandidates {
@@ -177,6 +181,8 @@ public final class CandidateBarView: UIView {
             dismissButton.frame = CGRect(x: right - buttonWidth, y: 0, width: buttonWidth, height: h)
             right -= buttonWidth
             settingsButton.frame = CGRect(x: right - buttonWidth, y: 0, width: buttonWidth, height: h)
+            right -= buttonWidth
+            symbolsButton.frame = CGRect(x: right - buttonWidth, y: 0, width: buttonWidth, height: h)
             right -= buttonWidth
         }
         var left: CGFloat = 4
@@ -221,6 +227,10 @@ public final class CandidateBarView: UIView {
 
     @objc private func tapDismiss() {
         delegate?.candidateBarDidTapDismiss(self)
+    }
+
+    @objc private func tapSymbols() {
+        delegate?.candidateBarDidTapSymbols(self)
     }
 }
 

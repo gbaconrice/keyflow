@@ -16,6 +16,7 @@ public enum KeyAction: Equatable {
     case shift
     case switchMode(KeyboardMode)
     case setOneHandedMode(OneHandedMode)
+    case toggleCase
 }
 
 public protocol KeyboardViewDelegate: AnyObject {
@@ -210,6 +211,7 @@ public final class KeyboardView: UIView {
         case .shift: return "シフト"
         case let .switchMode(mode): return label(for: mode)
         case .nextKeyboard: return "次のキーボード"
+        case .caseToggle: return "大文字・小文字の切り替え"
         }
     }
 
@@ -251,6 +253,7 @@ public final class KeyboardView: UIView {
         case .cursorRight: perform(.cursorRight)
         case .shift: perform(.shift)
         case let .switchMode(mode): perform(.switchMode(mode))
+        case .caseToggle: perform(.toggleCase)
         case .nextKeyboard: break
         }
     }
@@ -320,6 +323,8 @@ public final class KeyboardView: UIView {
             return KeyAppearance(title: label(for: target), fontSize: functionalFont, style: .functional)
         case .nextKeyboard:
             return KeyAppearance(systemImage: "globe", fontSize: fontSize, style: .functional)
+        case .caseToggle:
+            return KeyAppearance(title: "a/A", fontSize: fontSize * 0.8, style: .normal)
         }
     }
 
@@ -537,6 +542,8 @@ public final class KeyboardView: UIView {
             }
         case let .switchMode(mode):
             perform(.switchMode(mode))
+        case .caseToggle:
+            perform(.toggleCase)
         case .delete, .cursorLeft, .cursorRight, .shift, .nextKeyboard:
             break
         }

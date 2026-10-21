@@ -144,14 +144,8 @@ public final class KeyboardSession: NSObject, KeyboardViewDelegate, CandidateBar
     }
 
     private func refreshLayout() {
-        let spec = KeyboardLayouts.layout(for: mode, showsGlobeKey: showsGlobeKey)
-        var layoutSpec = spec
-        if spec.columnWeights.count == 5 {
-            layoutSpec = spec.mode == .kana
-                ? KeyboardLayouts.kana(showsGlobeKey: showsGlobeKey, sideColumnWeight: settings.sideColumnRatio)
-                : KeyboardLayouts.number(showsGlobeKey: showsGlobeKey, sideColumnWeight: settings.sideColumnRatio)
-        }
-        rootView.keyboardView.update(spec: layoutSpec, settings: settings, isLandscape: isLandscape)
+        let spec = KeyboardLayouts.layout(for: mode, showsGlobeKey: showsGlobeKey, englishLayout: settings.englishLayout, sideColumnWeight: settings.sideColumnRatio)
+        rootView.keyboardView.update(spec: spec, settings: settings, isLandscape: isLandscape)
     }
 
     private func apply(_ state: InputViewState) {
@@ -205,6 +199,8 @@ public final class KeyboardSession: NSObject, KeyboardViewDelegate, CandidateBar
             var s = settings
             s.oneHandedMode = oneHanded
             changeSettingsFromKeyboard(s)
+        case .toggleCase:
+            controller.toggleCase()
         }
     }
 
@@ -250,6 +246,25 @@ public final class KeyboardSession: NSObject, KeyboardViewDelegate, CandidateBar
 
     public func candidateBarDidTapDismiss(_ bar: CandidateBarView) {
         onDismiss?()
+    }
+
+    public func candidateBarDidTapSymbols(_ bar: CandidateBarView) {
+        if rootView.overlay is SymbolPanelView {
+            closeOverlay()
+            return
+        }
+        let panel = SymbolPanelView()
+        panel.onInsert = { [weak self] text in
+            self?.feedback.touchDown(haptic: self?.settings.hapticFeedback ?? false, sound: self?.settings.keySound ?? false)
+            self?.controller.insertSymbol(text)
+        }
+        panel.onDelete = { [weak self] in
+            self?.controller.delete()
+        }
+        panel.onClose = { [weak self] in
+            self?.closeOverlay()
+        }
+        rootView.overlay = panel
     }
 }
 #endif

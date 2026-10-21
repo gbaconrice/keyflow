@@ -131,6 +131,10 @@ struct InputSettingsView: View {
                 }
                 SliderRow(title: "削除の連続が始まるまで", value: $model.settings.deleteRepeatDelay, range: KeyboardSettings.Ranges.deleteRepeatDelay, step: 0.05) { String(format: "%.2f秒", $0) }
                 SliderRow(title: "空白キーでのカーソル移動の細かさ", value: $model.settings.cursorDragStep, range: KeyboardSettings.Ranges.cursorDragStep) { "\(Int($0.rounded())) pt" }
+                Picker("英字の配列", selection: $model.settings.englishLayout) {
+                    Text("QWERTY").tag(EnglishLayout.qwerty)
+                    Text("12キー（フリック）").tag(EnglishLayout.flick)
+                }
                 Toggle("英字の文頭を大文字にする", isOn: $model.settings.englishAutoCapitalization)
             }
             Section {

@@ -418,4 +418,43 @@ struct InputControllerTests {
         #expect(!h.controller.state.isReconverting)
         #expect(h.candidates.isEmpty)
     }
+
+    @Test("英字12キー: 連打で文字を巡回し、入力欄に直接入る")
+    func englishFlickToggle() {
+        let h = Harness()
+        h.controller.switchMode(to: .english)
+        let layout = KeyboardLayouts.englishFlick(showsGlobeKey: false)
+        let abc = Keys.spec("e_abc", in: layout)
+        let def = Keys.spec("e_def", in: layout)
+        h.controller.flick(keyID: "e_abc", spec: abc, direction: .center)
+        h.controller.flick(keyID: "e_abc", spec: abc, direction: .center)
+        #expect(h.field.text == "b")
+        #expect(h.field.markedText == nil)
+        h.controller.flick(keyID: "e_def", spec: def, direction: .up)
+        #expect(h.field.text == "bf")
+        h.controller.cursorRight()
+        h.controller.flick(keyID: "e_abc", spec: abc, direction: .center)
+        h.controller.cursorRight()
+        h.controller.flick(keyID: "e_abc", spec: abc, direction: .center)
+        #expect(h.field.text == "bfaa")
+    }
+
+    @Test("英字12キー: a/Aで直前の文字の大文字・小文字を切り替える")
+    func englishCaseToggle() {
+        let h = Harness(text: "x")
+        h.controller.switchMode(to: .english)
+        h.controller.toggleCase()
+        #expect(h.field.text == "X")
+        h.controller.toggleCase()
+        #expect(h.field.text == "x")
+    }
+
+    @Test("記号の一覧から入れると、入力中の文字列を確定してから入る")
+    func insertSymbol() {
+        let h = Harness()
+        h.flick("あ")
+        h.controller.insertSymbol("(^^)")
+        #expect(h.field.text == "あ(^^)")
+        #expect(h.field.markedText == nil)
+    }
 }

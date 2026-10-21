@@ -152,11 +152,11 @@ public final class InputController {
         guard let output = spec.output(for: direction) else {
             return
         }
+        let t = now()
         if mode == .english {
-            insertDirect(output)
+            flickDirect(keyID: keyID, spec: spec, direction: direction, output: output, time: t)
             return
         }
-        let t = now()
         // トグル入力: 同じキーの連打で直前の文字を巡回させる
         if direction == .center, settings.toggleInputEnabled, spec.toggleCycle.count > 1,
            var current = toggle, current.keyID == keyID, selectedIndex == nil,
@@ -184,6 +184,59 @@ public final class InputController {
             toggle = nil
         }
         compositionChanged()
+    }
+
+    /// 英字12キー: 入力中の文字列を使わず、入力欄に直接入れる。トグルは入力欄の直前の文字を置き換える。
+    private func flickDirect(keyID: String, spec: FlickKeySpec, direction: FlickDirection, output: String, time t: Date) {
+        if direction == .center, settings.toggleInputEnabled, spec.toggleCycle.count > 1,
+           var current = toggle, current.keyID == keyID,
+           settings.toggleTimeout <= 0 || t.timeIntervalSince(current.time) <= settings.toggleTimeout,
+           let document, let before = document.documentContextBeforeInput,
+           let last = before.last, String(last).lowercased() == current.current.lowercased() {
+            let wasUpper = String(last) != String(last).lowercased()
+            current.index = (current.index + 1) % current.cycle.count
+            current.time = t
+            toggle = current
+            document.deleteBackward()
+            document.insertText(wasUpper ? current.current.uppercased() : current.current)
+            recordExpectedContext()
+            rebuildState()
+            return
+        }
+        var text = output
+        if shift != .off {
+            text = text.uppercased()
+            if shift == .once {
+                shift = .off
+            }
+        }
+        insertDirect(text)
+        if direction == .center, settings.toggleInputEnabled, spec.toggleCycle.count > 1 {
+            toggle = ToggleState(keyID: keyID, cycle: spec.toggleCycle, index: spec.toggleCycle.firstIndex(of: output) ?? 0, time: t)
+        }
+        updateAutoShift()
+        rebuildState()
+    }
+
+    /// 英字12キーの「a/A」: 直前の英字の大文字・小文字を切り替える
+    public func toggleCase() {
+        beginKeyAction()
+        toggle = nil
+        guard composition.isEmpty, let document, let last = document.documentContextBeforeInput?.last, last.isLetter, last.isASCII else {
+            return
+        }
+        let s = String(last)
+        let toggled = s == s.lowercased() ? s.uppercased() : s.lowercased()
+        document.deleteBackward()
+        document.insertText(toggled)
+        recordExpectedContext()
+        rebuildState()
+    }
+
+    /// 記号・顔文字の一覧から選んだ文字列を入れる
+    public func insertSymbol(_ text: String) {
+        beginKeyAction()
+        insertDirect(text)
     }
 
     /// 文字キー（英字QWERTYなど）
