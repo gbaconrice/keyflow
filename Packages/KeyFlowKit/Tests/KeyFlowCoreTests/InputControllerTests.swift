@@ -206,6 +206,19 @@ struct InputControllerTests {
         #expect(h.field.text == "今日は")
     }
 
+    @Test("英字に切り替えると、日本語の次の語の予測と「取消」を消す")
+    func englishClearsPredictions() {
+        let h = Harness()
+        h.flick("きょう")
+        h.controller.space()
+        h.controller.enter()
+        #expect(!h.candidates.isEmpty)
+        h.controller.switchMode(to: .english)
+        #expect(h.candidates.isEmpty)
+        #expect(!h.controller.state.canUndoCommit)
+        #expect(h.field.text == "今日")
+    }
+
     @Test("入力中に◀でカーソルを動かすと、カーソルより前だけを変換する")
     func cursorInsideComposition() {
         let h = Harness()

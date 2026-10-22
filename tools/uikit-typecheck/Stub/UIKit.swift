@@ -43,6 +43,19 @@ open class CALayer: NSObject {
     open var masksToBounds = false
     open var borderWidth: CGFloat = 0
     open var borderColor: CGColor?
+    open var frame: CGRect = .zero
+    open var mask: CALayer?
+}
+open class CAGradientLayer: CALayer {
+    open var colors: [Any]?
+    open var locations: [NSNumber]?
+    open var startPoint: CGPoint = .zero
+    open var endPoint: CGPoint = .zero
+}
+open class CATransaction: NSObject {
+    open class func begin() {}
+    open class func commit() {}
+    open class func setDisableActions(_ flag: Bool) {}
 }
 open class UIBezierPath: NSObject {
     public init(roundedRect rect: CGRect, cornerRadius: CGFloat) {}
@@ -195,12 +208,20 @@ open class UIButton: UIControl {
     open func setTitle(_ title: String?, for state: UIControlState) {}
     open func setTitleColor(_ color: UIColor?, for state: UIControlState) {}
 }
+public protocol UIScrollViewDelegate: AnyObject {
+    func scrollViewDidScroll(_ scrollView: UIScrollView)
+}
+public extension UIScrollViewDelegate {
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {}
+}
 open class UIScrollView: UIView {
     open var showsHorizontalScrollIndicator = true
     open var alwaysBounceHorizontal = false
     open var alwaysBounceVertical = false
     open var delaysContentTouches = true
     open var contentSize: CGSize = .zero
+    open var contentOffset: CGPoint = .zero
+    open weak var delegate: (any UIScrollViewDelegate)?
     open func setContentOffset(_ p: CGPoint, animated: Bool) {}
     open func scrollRectToVisible(_ r: CGRect, animated: Bool) {}
 }

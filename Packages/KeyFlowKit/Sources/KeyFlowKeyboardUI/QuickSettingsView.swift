@@ -22,6 +22,7 @@ public final class QuickSettingsView: UIView {
     private let toggleSwitch = UISwitch()
     private let hapticSwitch = UISwitch()
     private let spaceControl = UISegmentedControl(items: ["半角", "全角"])
+    private let kanaLayoutControl = UISegmentedControl(items: ["12キー", "ローマ字"])
 
     public init(settings: KeyboardSettings, isLandscape: Bool, hasFullAccess: Bool) {
         self.settings = settings
@@ -57,6 +58,9 @@ public final class QuickSettingsView: UIView {
         stack.isLayoutMarginsRelativeArrangement = true
         stack.layoutMargins = UIEdgeInsets(top: 8, left: 14, bottom: 12, right: 14)
         stack.addArrangedSubview(header)
+
+        kanaLayoutControl.addTarget(self, action: #selector(changed), for: .valueChanged)
+        stack.addArrangedSubview(row("日本語の配列", kanaLayoutControl, nil))
 
         heightSlider.addTarget(self, action: #selector(changed), for: .valueChanged)
         stack.addArrangedSubview(row(isLandscape ? "高さ（横画面）" : "高さ", heightSlider, heightValue))
@@ -125,6 +129,7 @@ public final class QuickSettingsView: UIView {
         toggleSwitch.isOn = settings.toggleInputEnabled
         spaceControl.selectedSegmentIndex = settings.spaceWidth == .half ? 0 : 1
         hapticSwitch.isOn = settings.hapticFeedback
+        kanaLayoutControl.selectedSegmentIndex = settings.kanaLayout == .flick ? 0 : 1
         updateValueLabels()
     }
 
@@ -149,6 +154,7 @@ public final class QuickSettingsView: UIView {
         settings.toggleInputEnabled = toggleSwitch.isOn
         settings.spaceWidth = spaceControl.selectedSegmentIndex == 0 ? .half : .full
         settings.hapticFeedback = hapticSwitch.isOn
+        settings.kanaLayout = kanaLayoutControl.selectedSegmentIndex == 0 ? .flick : .romaji
         updateValueLabels()
         onChange?(settings)
     }

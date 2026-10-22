@@ -157,10 +157,34 @@ jobs:
           xcrun simctl boot "$SIM_UDID"
           xcrun simctl bootstatus "$SIM_UDID" -b
           echo "AppleKeyboards:"; xcrun simctl spawn "$SIM_UDID" defaults read -g AppleKeyboards || true
+          # テスト中のキーボード拡張のメモリ使用量を1秒ごとに記録する（シミュレーターの値で、実機とは異なる）
+          (
+            while true; do
+              PID="$(pgrep -f 'KeyFlowKeyboard.appex/KeyFlowKeyboard' | head -1 || true)"
+              if [ -n "$PID" ]; then
+                FP="$(sudo vmmap --summary "$PID" 2>/dev/null | grep -E '^Physical footprint' | tr -s ' ' | paste -sd ';' - || true)"
+                RSS="$(ps -o rss= -p "$PID" 2>/dev/null | tr -d ' ' || true)"
+                echo "$(date +%T) pid=$PID rss_kb=$RSS $FP" >> extension-memory.log
+              fi
+              sleep 1
+            done
+          ) &
+          SAMPLER=$!
           xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination "id=$SIM_UDID" \
             -only-testing:KeyFlowUITests/KeyboardExtensionUITests \
             -resultBundlePath ExtensionResults.xcresult \
             2>&1 | tee test-extension.log | grep -E "error:|Test Case|TEST (EXECUTE )?(SUCCEEDED|FAILED)" || true
+          kill "$SAMPLER" 2>/dev/null || true
+          {
+            echo "## キーボード拡張のメモリ（シミュレーター）"
+            echo
+            if [ -s extension-memory.log ]; then
+              echo "- 最大RSS: $(awk '{ for (i = 1; i <= NF; i++) if ($i ~ /^rss_kb=/) { v = substr($i, 8) + 0; if (v > m) m = v } } END { printf "%.1f MB", m / 1024 }' extension-memory.log)"
+              echo "- 最後の計測: \`$(tail -1 extension-memory.log)\`"
+            else
+              echo "- 計測できなかった"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
           echo "AppleKeyboards after:"; xcrun simctl spawn "$SIM_UDID" defaults read -g AppleKeyboards || true
           grep -qE "TEST (EXECUTE )?SUCCEEDED" test-extension.log
       - name: Export screenshots
@@ -190,3 +214,4 @@ jobs:
             build-sim.log
             test-ui.log
             test-extension.log
+            extension-memory.log

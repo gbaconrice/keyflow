@@ -66,6 +66,8 @@ public struct KeyboardSettings: Codable, Sendable, Equatable {
     /// 入力中の文字列に下線を付けて表示する（marked text）。
     /// 無効にすると、入力中の文字を通常の文字として挿入・置換する。
     public var usesMarkedText: Bool = true
+    /// 日本語の配列（12キーのフリック／QWERTYのローマ字）
+    public var kanaLayout: KanaLayout = .flick
     /// 英字入力で文頭を大文字にする
     public var englishAutoCapitalization: Bool = false
     /// 英字の配列
@@ -153,7 +155,7 @@ public struct KeyboardSettings: Codable, Sendable, Equatable {
         case horizontalKeySpacing, verticalKeySpacing, sideMargin, bottomMargin, sideColumnRatio
         case oneHandedMode, oneHandedWidthRatio, landscapeWidthRatio, keyCornerRadius, kanaFontSize, candidateFontSize
         case flickThreshold, toggleInputEnabled, toggleTimeout, showsFlickGuide, showsKeyHints, spaceWidth, usesMarkedText
-        case englishAutoCapitalization, englishLayout, deleteRepeatDelay, cursorDragStep
+        case kanaLayout, englishAutoCapitalization, englishLayout, deleteRepeatDelay, cursorDragStep
         case hapticFeedback, keySound
         case learningEnabled, predictionEnabled, nextWordPredictionEnabled, emojiCandidates, reconversionEnabled
         case updatedAt
@@ -186,6 +188,7 @@ public struct KeyboardSettings: Codable, Sendable, Equatable {
         showsKeyHints = v(.showsKeyHints, d.showsKeyHints)
         spaceWidth = v(.spaceWidth, d.spaceWidth)
         usesMarkedText = v(.usesMarkedText, d.usesMarkedText)
+        kanaLayout = v(.kanaLayout, d.kanaLayout)
         englishAutoCapitalization = v(.englishAutoCapitalization, d.englishAutoCapitalization)
         englishLayout = v(.englishLayout, d.englishLayout)
         deleteRepeatDelay = v(.deleteRepeatDelay, d.deleteRepeatDelay)
@@ -223,6 +226,7 @@ public struct KeyboardSettings: Codable, Sendable, Equatable {
         try c.encode(showsKeyHints, forKey: .showsKeyHints)
         try c.encode(spaceWidth, forKey: .spaceWidth)
         try c.encode(usesMarkedText, forKey: .usesMarkedText)
+        try c.encode(kanaLayout, forKey: .kanaLayout)
         try c.encode(englishAutoCapitalization, forKey: .englishAutoCapitalization)
         try c.encode(englishLayout, forKey: .englishLayout)
         try c.encode(deleteRepeatDelay, forKey: .deleteRepeatDelay)

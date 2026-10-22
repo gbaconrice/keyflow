@@ -274,14 +274,15 @@ public final class KeyboardView: UIView {
             }
             return KeyAppearance(title: flickSpec.label, fontSize: flickSpec.label.count > 2 ? fontSize * 0.75 : fontSize, style: .normal, hints: hints, subtitle: flickSpec.subLabel)
         case let .character(text):
-            let shown = (spec.mode == .english && state.shift != .off) ? text.uppercased() : text
+            let shown = state.shift != .off ? text.uppercased() : text
             return KeyAppearance(title: shown, fontSize: fontSize, style: .normal)
         case .modifier:
             return KeyAppearance(title: "小゛゜", fontSize: fontSize * 0.75, style: .normal)
         case .delete:
             return KeyAppearance(systemImage: "delete.left", fontSize: fontSize, style: .functional)
         case .space:
-            return KeyAppearance(title: state.spaceKeyLabel, fontSize: functionalFont, style: spec.mode == .english ? .normal : .functional)
+            // QWERTY系（英字・ローマ字）は標準キーボードと同じく白い空白キーにする
+            return KeyAppearance(title: state.spaceKeyLabel, fontSize: functionalFont, style: spec.isRowBased ? .normal : .functional)
         case .enter:
             return KeyAppearance(title: state.enterKeyLabel, fontSize: functionalFont, style: state.enterKeyEmphasized ? .accent : .functional, enabled: !state.enterKeyDisabled)
         case .cursorLeft:

@@ -9,6 +9,10 @@ final class KeyboardExtensionUITests: XCTestCase {
         continueAfterFailure = true
     }
 
+    override func tearDown() {
+        XCUIDevice.shared.orientation = .portrait
+    }
+
     private func snap(_ app: XCUIApplication, _ name: String) {
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = name
@@ -34,6 +38,7 @@ final class KeyboardExtensionUITests: XCTestCase {
 
     func testTypingWithSystemKeyboard() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-KeyFlowResetSettings"]
         app.launch()
         app.buttons["試し打ち"].firstMatch.tap()
         let editor = app.textViews.firstMatch
@@ -89,6 +94,7 @@ final class KeyboardExtensionUITests: XCTestCase {
     /// 入力中に入力欄をタップしても、文字が重複・消失しない（外部からの変更の検出）
     func testTapWhileComposing() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-KeyFlowResetSettings"]
         app.launch()
         app.buttons["試し打ち"].firstMatch.tap()
         let editor = app.textViews.firstMatch
@@ -116,5 +122,101 @@ final class KeyboardExtensionUITests: XCTestCase {
         note("31-text", text)
         snap(app, "32-after-enter")
         XCTAssertEqual(text, "あいう", "入力中のタップで文字が重複・消失していないこと")
+    }
+
+    /// キーボード上の調整パネルで日本語の配列を切り替える
+    private func setKanaLayout(_ app: XCUIApplication, _ name: String) {
+        let adjust = app.buttons["キーボードの調整"].firstMatch
+        guard adjust.waitForExistence(timeout: 3) else {
+            XCTFail("キーボードの調整ボタンが見つからない")
+            return
+        }
+        adjust.tap()
+        let segment = app.buttons[name].firstMatch
+        if segment.waitForExistence(timeout: 3) {
+            segment.tap()
+        } else {
+            XCTFail("「\(name)」が見つからない")
+        }
+        app.buttons["完了"].firstMatch.tap()
+        Thread.sleep(forTimeInterval: 0.5)
+    }
+
+    /// ローマ字入力（QWERTY）に切り替えて入力・変換する
+    func testRomajiInput() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["-KeyFlowResetSettings"]
+        app.launch()
+        app.buttons["試し打ち"].firstMatch.tap()
+        let editor = app.textViews.firstMatch
+        XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        editor.tap()
+        guard key(app, "a").waitForExistence(timeout: 10) else {
+            XCTFail("キーボード拡張のキーが見つからない")
+            return
+        }
+        Thread.sleep(forTimeInterval: 2)
+        setKanaLayout(app, "ローマ字")
+        if key(app, "ro_k").waitForExistence(timeout: 5) {
+            snap(app, "50-romaji")
+            for c in "kyouhaiitenki" {
+                key(app, "ro_\(c)").tap()
+            }
+            Thread.sleep(forTimeInterval: 1)
+            snap(app, "51-romaji-composing")
+            note("51-text", (editor.value as? String) ?? "(nil)")
+            key(app, "space").tap()
+            Thread.sleep(forTimeInterval: 0.5)
+            key(app, "enter").tap()
+            Thread.sleep(forTimeInterval: 0.5)
+            snap(app, "52-romaji-committed")
+            let text = (editor.value as? String) ?? ""
+            note("52-text", text)
+            XCTAssertEqual(text, "今日はいい天気")
+        } else {
+            XCTFail("ローマ字の配列に切り替わらない")
+        }
+        // 他のテストに影響しないよう12キーに戻す（予測候補が出ていると調整ボタンが隠れるので、先に消去する）
+        app.buttons["消去"].firstMatch.tap()
+        key(app, "delete").tap()
+        Thread.sleep(forTimeInterval: 1)
+        setKanaLayout(app, "12キー")
+        XCTAssertTrue(key(app, "a").waitForExistence(timeout: 5))
+    }
+
+    /// ダークモードと横画面で表示・入力できる
+    func testDarkAndLandscape() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-KeyFlowForceDark"]
+        app.launchArguments += ["-KeyFlowResetSettings"]
+        app.launch()
+        app.buttons["試し打ち"].firstMatch.tap()
+        let editor = app.textViews.firstMatch
+        XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        editor.tap()
+        guard key(app, "a").waitForExistence(timeout: 10) else {
+            XCTFail("キーボード拡張のキーが見つからない")
+            return
+        }
+        Thread.sleep(forTimeInterval: 2)
+        snap(app, "40-dark-portrait")
+
+        XCUIDevice.shared.orientation = .landscapeLeft
+        Thread.sleep(forTimeInterval: 2)
+        snap(app, "41-dark-landscape")
+        // か左=き、ん=わ上
+        flick(key(app, "ka"), dx: -40, dy: 0)
+        flick(key(app, "wa"), dx: 0, dy: -40)
+        Thread.sleep(forTimeInterval: 0.5)
+        snap(app, "42-landscape-composing")
+        key(app, "enter").tap()
+        Thread.sleep(forTimeInterval: 0.5)
+        let text = (editor.value as? String) ?? ""
+        note("42-text", text)
+        XCTAssertEqual(text, "きん")
+
+        XCUIDevice.shared.orientation = .portrait
+        Thread.sleep(forTimeInterval: 2)
+        snap(app, "43-back-to-portrait")
     }
 }

@@ -52,10 +52,13 @@ final class CandidateCell: UIControl {
 /// キーボード上部の変換候補バー。
 ///
 /// 候補が無いときは「取消」と道具ボタン（設定・キーボードを閉じる）を表示する。
-public final class CandidateBarView: UIView {
+public final class CandidateBarView: UIView, UIScrollViewDelegate {
     public weak var delegate: (any CandidateBarDelegate)?
 
     private let scrollView = UIScrollView()
+    /// 候補が右にまだ続くとき、右端を薄くして続きがあることを示す
+    private let fadeMask = CAGradientLayer()
+    private let fadeWidth: CGFloat = 28
     private var cells: [CandidateCell] = []
     private var candidates: [ConversionCandidate] = []
     private var requestID = -1
@@ -84,7 +87,11 @@ public final class CandidateBarView: UIView {
         scrollView.showsHorizontalScrollIndicator = false
         scrollView.alwaysBounceHorizontal = true
         scrollView.delaysContentTouches = false
+        scrollView.delegate = self
         addSubview(scrollView)
+        fadeMask.startPoint = CGPoint(x: 0, y: 0.5)
+        fadeMask.endPoint = CGPoint(x: 1, y: 0.5)
+        fadeMask.colors = [UIColor.black.cgColor, UIColor.black.cgColor, UIColor.clear.cgColor]
 
         func setup(_ b: UIButton, _ image: String, _ label: String, _ action: Selector) {
             b.setImage(UIImage(systemName: image, withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .regular)), for: .normal)
@@ -236,11 +243,33 @@ public final class CandidateBarView: UIView {
             x += w + 2
         }
         scrollView.contentSize = CGSize(width: x, height: h)
+        updateFade()
         forgetPrompt.frame = bounds
         let buttonW: CGFloat = 76
         forgetCancelButton.frame = CGRect(x: bounds.width - buttonW, y: 0, width: buttonW, height: h)
         forgetButton.frame = CGRect(x: bounds.width - buttonW * 2, y: 0, width: buttonW, height: h)
         forgetLabel.frame = CGRect(x: 12, y: 0, width: max(bounds.width - buttonW * 2 - 16, 0), height: h)
+    }
+
+    public func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        updateFade()
+    }
+
+    private func updateFade() {
+        let width = scrollView.bounds.width
+        let hasMore = scrollView.contentSize.width - scrollView.contentOffset.x > width + 1
+        guard hasMore, width > fadeWidth else {
+            scrollView.layer.mask = nil
+            return
+        }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        // スクロールビューのレイヤーはスクロールに合わせて座標がずれるので、見えている範囲に合わせる
+        fadeMask.frame = scrollView.bounds
+        let start = NSNumber(value: Double((width - fadeWidth) / width))
+        fadeMask.locations = [0, start, 1]
+        scrollView.layer.mask = fadeMask
+        CATransaction.commit()
     }
 
     @objc private func longPressCandidate(_ recognizer: UILongPressGestureRecognizer) {

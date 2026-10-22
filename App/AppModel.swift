@@ -26,6 +26,13 @@ final class AppModel: ObservableObject {
         // キーボード上で変えた設定はアプリから読めないので、アプリで保存した値を表示する
         self.settings = store.loadSharedSettings() ?? .default
         self.userDictionary = store.loadUserDictionary()
+        if ProcessInfo.processInfo.arguments.contains("-KeyFlowResetSettings") {
+            // UIテスト用: 前のテストで変えた設定を持ち越さない（キーボードにも新しい設定として渡す）
+            var s = KeyboardSettings.default
+            s.updatedAt = Date()
+            store.saveSharedSettings(s)
+            self.settings = s
+        }
     }
 
     var isSharedAvailable: Bool { store.isSharedAvailable }

@@ -157,6 +157,7 @@ public final class InputController {
             flickDirect(keyID: keyID, spec: spec, direction: direction, output: output, time: t)
             return
         }
+        flushRomaji()
         // トグル入力: 同じキーの連打で直前の文字を巡回させる
         if direction == .center, settings.toggleInputEnabled, spec.toggleCycle.count > 1,
            var current = toggle, current.keyID == keyID, selectedIndex == nil,
@@ -239,9 +240,13 @@ public final class InputController {
         insertDirect(text)
     }
 
-    /// 文字キー（英字QWERTYなど）
+    /// 文字キー（英字QWERTY・ローマ字入力）
     public func character(_ text: String) {
         beginKeyAction()
+        if mode == .kana {
+            romajiCharacter(text)
+            return
+        }
         var output = text
         if mode == .english, shift != .off {
             output = text.uppercased()
@@ -251,6 +256,62 @@ public final class InputController {
         }
         insertDirect(output)
         updateAutoShift()
+    }
+
+    /// ローマ字入力の文字キー。小文字の英字はローマ字として読み、それ以外（シフト中の大文字・「ー」）はそのまま入れる。
+    private func romajiCharacter(_ text: String) {
+        toggle = nil
+        if selectedIndex != nil {
+            commitSelectedCandidate(continueComposing: true)
+        }
+        lastCommit = nil
+        var output = text
+        if shift != .off {
+            output = text.uppercased()
+            if shift == .once {
+                shift = .off
+            }
+        }
+        if output.count == 1, let c = output.first, RomajiConverter.isRomajiLetter(c) {
+            let run = pendingRomaji()
+            for _ in 0..<run.count {
+                composition.deleteBackward()
+            }
+            composition.insert(RomajiConverter.convert(run + output))
+        } else {
+            flushRomaji()
+            composition.insert(output)
+        }
+        compositionChanged()
+    }
+
+    /// カーソル直前にある、まだかなにしていない英字（ローマ字の綴りの途中）
+    private func pendingRomaji() -> String {
+        guard settings.kanaLayout == .romaji else { return "" }
+        return String(composition.textBeforeCursor.reversed().prefix { RomajiConverter.isRomajiLetter($0) }.reversed())
+    }
+
+    /// 綴りの途中の英字を確定する（末尾の"n"を「ん」にする）。入力中の文字列が変わればtrue。
+    @discardableResult
+    private func flushRomaji() -> Bool {
+        let run = pendingRomaji()
+        guard !run.isEmpty else { return false }
+        let flushed = RomajiConverter.flush(run)
+        guard flushed != run else { return false }
+        for _ in 0..<run.count {
+            composition.deleteBackward()
+        }
+        composition.insert(flushed)
+        return true
+    }
+
+    /// 変換に使う読み。ローマ字の綴りの途中の英字は除き、"n"は「ん」として読む。
+    private var conversionSource: String {
+        let before = composition.textBeforeCursor
+        let run = pendingRomaji()
+        guard !run.isEmpty else { return before }
+        let kana = RomajiConverter.flush(run).prefix { !RomajiConverter.isRomajiLetter($0) }
+        return String(before.dropLast(run.count)) + kana
     }
 
     /// 「小゛゜」キー。centerは巡回、左は濁点、上は小文字、右は半濁点。
@@ -324,6 +385,9 @@ public final class InputController {
             updateAutoShift()
             return
         }
+        if flushRomaji() {
+            render()
+        }
         refreshCandidatesIfNeeded()
         // 予測候補は飛ばし、入力を変換した候補だけを順に選ぶ
         let cycle = candidateList.candidates.indices.filter { !candidateList.candidates[$0].isPrediction }
@@ -346,6 +410,9 @@ public final class InputController {
             return
         }
         if !composition.isEmpty {
+            if flushRomaji() {
+                render()
+            }
             commitComposition()
             rebuildState()
             return
@@ -395,7 +462,8 @@ public final class InputController {
         if !composition.isEmpty {
             if settings.usesMarkedText {
                 selectedIndex = nil
-                if composition.moveCursor(by: offset) != 0 {
+                let flushed = flushRomaji()
+                if composition.moveCursor(by: offset) != 0 || flushed {
                     compositionChanged()
                 }
                 return
@@ -474,7 +542,7 @@ public final class InputController {
         conversion.forget(candidate, of: candidateList)
         // 並び順を更新するため、変換し直す
         if !composition.isEmpty, selectedIndex == nil {
-            let source = composition.textBeforeCursor
+            let source = conversionSource
             if !source.isEmpty {
                 conversion.request(source: source, options: conversionOptions)
             }
@@ -575,6 +643,9 @@ public final class InputController {
     /// キーボードが閉じる・入力欄が切り替わる前に、入力中の文字列を確定する
     public func finishInput() {
         toggle = nil
+        if flushRomaji() {
+            render()
+        }
         if selectedIndex != nil {
             commitSelectedCandidate(continueComposing: false)
         } else if !composition.isEmpty {
@@ -598,6 +669,9 @@ public final class InputController {
 
     private func setMode(_ newMode: KeyboardMode, commitComposition shouldCommit: Bool) {
         toggle = nil
+        if flushRomaji() {
+            render()
+        }
         if shouldCommit {
             if selectedIndex != nil {
                 commitSelectedCandidate(continueComposing: false)
@@ -607,6 +681,9 @@ public final class InputController {
         }
         mode = newMode
         if newMode == .english {
+            // 日本語の次の語の予測と「取消」は英字では使わないので消す
+            clearIdleCandidates()
+            lastCommit = nil
             updateAutoShift()
         } else {
             shift = .off
@@ -648,7 +725,7 @@ public final class InputController {
         render()
         if requestConversion {
             selectedIndex = nil
-            let source = composition.textBeforeCursor
+            let source = conversionSource
             if source.isEmpty {
                 conversion.cancel()
                 candidateList = .empty
@@ -700,7 +777,7 @@ public final class InputController {
     }
 
     private func refreshCandidatesIfNeeded() {
-        let source = composition.textBeforeCursor
+        let source = conversionSource
         guard !source.isEmpty, candidateList.source != source || candidateList.requestID != conversion.latestRequestID else {
             return
         }
@@ -724,7 +801,7 @@ public final class InputController {
             rebuildState()
             return
         }
-        guard selectedIndex == nil, list.source == composition.textBeforeCursor else {
+        guard selectedIndex == nil, list.source == conversionSource else {
             return
         }
         candidateList = list
@@ -742,6 +819,10 @@ public final class InputController {
     /// 候補を確定する。候補が入力の一部（先頭の文節）だけを置き換える場合は、残りを入力中のまま続ける。
     private func commit(candidate: ConversionCandidate, continueComposing: Bool) {
         guard let document else { return }
+        // 候補が末尾の"n"まで使っている（「ん」として変換した）ときは、入力中の文字列も「ん」にしておく
+        if candidate.consumedCount > composition.cursor - pendingRomaji().count {
+            flushRomaji()
+        }
         let consumed = max(0, min(candidate.consumedCount, composition.count))
         let reading = String(composition.characters.prefix(consumed))
         var remaining = composition

@@ -60,6 +60,14 @@ public enum KeyKind: Sendable, Equatable {
     case caseToggle
 }
 
+/// 日本語の配列
+public enum KanaLayout: String, Codable, Sendable, CaseIterable {
+    /// 12キーのフリック
+    case flick
+    /// QWERTYのローマ字入力
+    case romaji
+}
+
 /// 英字の配列
 public enum EnglishLayout: String, Codable, Sendable, CaseIterable {
     case qwerty
@@ -245,6 +253,47 @@ public enum KeyboardLayouts {
         return KeyboardLayoutSpec(mode: .english, columnWeights: Array(repeating: 1, count: 10), rowCount: 4, keys: keys, isRowBased: true)
     }
 
+    /// ローマ字入力のQWERTY配列
+    ///
+    /// ```
+    /// [q][w][e][r][t][y][u][i][o][p]
+    /// [a][s][d][f][g][h][j][k][l][ー]
+    /// [⇧] [z][x][c][v][b][n][m] [⌫]
+    /// [☆123][ABC][、][  空白  ][。][改行]
+    /// ```
+    public static func romaji(showsGlobeKey: Bool) -> KeyboardLayoutSpec {
+        var keys: [KeyDefinition] = []
+        let rows = ["qwertyuiop", "asdfghjkl", "zxcvbnm"]
+        for (r, letters) in rows.enumerated() {
+            let offset: Double = r == 2 ? 1.5 : 0
+            for (i, letter) in letters.enumerated() {
+                keys.append(.init(id: "ro_\(letter)", kind: .character(String(letter)), placement: .init(column: offset + Double(i), row: r)))
+            }
+        }
+        keys.append(.init(id: "ro_long", kind: .character("ー"), placement: .init(column: 9, row: 1)))
+        keys.append(.init(id: "shift", kind: .shift, placement: .init(column: 0, row: 2, width: 1.3), isFunctional: true))
+        keys.append(.init(id: "delete", kind: .delete, placement: .init(column: 8.7, row: 2, width: 1.3), isFunctional: true))
+        var column: Double = 0
+        keys.append(.init(id: "toNumber", kind: .switchMode(.number), placement: .init(column: column, row: 3, width: 1.25), isFunctional: true))
+        column += 1.25
+        keys.append(.init(id: "toEnglish", kind: .switchMode(.english), placement: .init(column: column, row: 3, width: 1.25), isFunctional: true))
+        column += 1.25
+        if showsGlobeKey {
+            keys.append(.init(id: "globe", kind: .nextKeyboard, placement: .init(column: column, row: 3, width: 1), isFunctional: true))
+            column += 1
+        }
+        // 、。は上フリックで？！も入れられる
+        keys.append(.init(id: "ro_comma", kind: .flick(FlickKeySpec(label: "、", outputs: [.center: "、", .up: "？"], subLabel: "？")), placement: .init(column: column, row: 3, width: 1)))
+        column += 1
+        let spaceWidth = 10 - column - 1 - 2.0
+        keys.append(.init(id: "space", kind: .space, placement: .init(column: column, row: 3, width: spaceWidth)))
+        column += spaceWidth
+        keys.append(.init(id: "ro_period", kind: .flick(FlickKeySpec(label: "。", outputs: [.center: "。", .up: "！"], subLabel: "！")), placement: .init(column: column, row: 3, width: 1)))
+        column += 1
+        keys.append(.init(id: "enter", kind: .enter, placement: .init(column: column, row: 3, width: 2.0), isFunctional: true))
+        return KeyboardLayoutSpec(mode: .kana, columnWeights: Array(repeating: 1, count: 10), rowCount: 4, keys: keys, isRowBased: true)
+    }
+
     /// 12キー配列の左下2キー（モード切替と地球儀）
     private static func leftBottomKeys(current: KeyboardMode, showsGlobeKey: Bool) -> [KeyDefinition] {
         let other: KeyboardMode = current == .kana ? .number : .kana
@@ -306,9 +355,13 @@ public enum KeyboardLayouts {
         return KeyboardLayoutSpec(mode: .english, columnWeights: [sideColumnWeight, 1, 1, 1, sideColumnWeight], rowCount: 4, keys: keys)
     }
 
-    public static func layout(for mode: KeyboardMode, showsGlobeKey: Bool, englishLayout: EnglishLayout = .qwerty, sideColumnWeight: Double = 0.86) -> KeyboardLayoutSpec {
+    public static func layout(for mode: KeyboardMode, showsGlobeKey: Bool, kanaLayout: KanaLayout = .flick, englishLayout: EnglishLayout = .qwerty, sideColumnWeight: Double = 0.86) -> KeyboardLayoutSpec {
         switch mode {
-        case .kana: return kana(showsGlobeKey: showsGlobeKey, sideColumnWeight: sideColumnWeight)
+        case .kana:
+            switch kanaLayout {
+            case .flick: return kana(showsGlobeKey: showsGlobeKey, sideColumnWeight: sideColumnWeight)
+            case .romaji: return romaji(showsGlobeKey: showsGlobeKey)
+            }
         case .number: return number(showsGlobeKey: showsGlobeKey, sideColumnWeight: sideColumnWeight)
         case .english:
             switch englishLayout {

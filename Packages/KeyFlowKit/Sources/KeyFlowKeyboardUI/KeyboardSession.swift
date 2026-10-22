@@ -144,7 +144,7 @@ public final class KeyboardSession: NSObject, KeyboardViewDelegate, CandidateBar
     }
 
     private func refreshLayout() {
-        let spec = KeyboardLayouts.layout(for: mode, showsGlobeKey: showsGlobeKey, englishLayout: settings.englishLayout, sideColumnWeight: settings.sideColumnRatio)
+        let spec = KeyboardLayouts.layout(for: mode, showsGlobeKey: showsGlobeKey, kanaLayout: settings.kanaLayout, englishLayout: settings.englishLayout, sideColumnWeight: settings.sideColumnRatio)
         rootView.keyboardView.update(spec: spec, settings: settings, isLandscape: isLandscape)
     }
 

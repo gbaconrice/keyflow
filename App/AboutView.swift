@@ -44,7 +44,7 @@ struct LicensesView: View {
     }
 
     private let items: [Item] = [
-        Item(name: "AzooKeyKanaKanjiConverter", license: "MIT License", note: "Copyright (c) 2023 Miwa / Ensan\nかな漢字変換エンジン"),
+        Item(name: "AzooKeyKanaKanjiConverter", license: "MIT License", note: "Copyright (c) 2023 Miwa / Ensan\nかな漢字変換エンジン、ローマ字の変換表"),
         Item(name: "azooKey_dictionary_storage", license: "Apache License 2.0", note: "変換辞書データ"),
         Item(name: "azooKey_emoji_dictionary_storage", license: "azooKeyの一部として配布", note: "絵文字辞書データ"),
         Item(name: "swift-algorithms / swift-collections / swift-numerics", license: "Apache License 2.0", note: "Copyright (c) Apple Inc."),

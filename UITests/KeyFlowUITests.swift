@@ -32,6 +32,7 @@ final class KeyFlowUITests: XCTestCase {
 
     func testHomeAndPreview() {
         let app = XCUIApplication()
+        app.launchArguments += ["-KeyFlowResetSettings"]
         app.launch()
         snap(app, "01-home")
         openLayoutSettings(app)
@@ -53,6 +54,7 @@ final class KeyFlowUITests: XCTestCase {
 
     func testToggleAndCursorKeys() {
         let app = XCUIApplication()
+        app.launchArguments += ["-KeyFlowResetSettings"]
         app.launch()
         openLayoutSettings(app)
         // あ を3回で「う」
@@ -66,6 +68,7 @@ final class KeyFlowUITests: XCTestCase {
     func testModesAndDarkAppearance() {
         let app = XCUIApplication()
         app.launchArguments = ["-KeyFlowForceDark"]
+        app.launchArguments += ["-KeyFlowResetSettings"]
         app.launch()
         openLayoutSettings(app)
         snap(app, "07-dark-kana")
@@ -77,6 +80,7 @@ final class KeyFlowUITests: XCTestCase {
 
     func testOneHandedAndInputSettings() {
         let app = XCUIApplication()
+        app.launchArguments += ["-KeyFlowResetSettings"]
         app.launch()
         app.buttons["入力操作"].firstMatch.tap()
         _ = key(app, "a").waitForExistence(timeout: 5)
@@ -92,8 +96,34 @@ final class KeyFlowUITests: XCTestCase {
         }
     }
 
+    /// 日本語の配列をローマ字（QWERTY）に切り替え、プレビューで打つ
+    func testRomajiPreview() {
+        let app = XCUIApplication()
+        app.launchArguments += ["-KeyFlowResetSettings"]
+        app.launch()
+        app.buttons["入力操作"].firstMatch.tap()
+        let picker = app.buttons["日本語の配列"].firstMatch
+        guard picker.waitForExistence(timeout: 5) else {
+            XCTFail("日本語の配列の選択が見つからない")
+            return
+        }
+        picker.tap()
+        app.buttons["ローマ字（QWERTY）"].firstMatch.tap()
+        guard key(app, "ro_k").waitForExistence(timeout: 5) else {
+            XCTFail("ローマ字の配列に切り替わらない")
+            return
+        }
+        for c in "kanji" {
+            key(app, "ro_\(c)").tap()
+        }
+        snap(app, "15-romaji-preview")
+        picker.tap()
+        app.buttons["12キー（フリック）"].firstMatch.tap()
+    }
+
     func testPanels() {
         let app = XCUIApplication()
+        app.launchArguments += ["-KeyFlowResetSettings"]
         app.launch()
         openLayoutSettings(app)
 

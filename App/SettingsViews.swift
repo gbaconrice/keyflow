@@ -104,6 +104,14 @@ struct InputSettingsView: View {
     var body: some View {
         PreviewedSettings(title: "入力操作") {
             Section {
+                Picker("日本語の配列", selection: $model.settings.kanaLayout) {
+                    Text("12キー（フリック）").tag(KanaLayout.flick)
+                    Text("ローマ字（QWERTY）").tag(KanaLayout.romaji)
+                }
+            } footer: {
+                Text("ローマ字では、nの次に母音以外を打つと「ん」になります。母音の前の「ん」は nn と打ちます。")
+            }
+            Section {
                 SliderRow(title: "フリックの判定距離", value: $model.settings.flickThreshold, range: KeyboardSettings.Ranges.flickThreshold) { "\(Int($0.rounded())) pt" }
                 Toggle("押している間、フリック先を表示", isOn: $model.settings.showsFlickGuide)
                 Toggle("キーの四隅にフリック先を表示", isOn: $model.settings.showsKeyHints)
