@@ -77,7 +77,7 @@ public final class AzooKeyEngine: ConversionEngine {
         let exact = ConversionHeuristics.reorder(
             result.mainResults.filter { $0.inputable && !$0.text.isEmpty },
             text: { $0.text },
-            score: { $0.value }
+            score: { Float($0.value) }
         )
         let predictions = result.predictionResults.filter { $0.inputable && !$0.text.isEmpty }
         var ordered: [(Candidate, Bool)] = []
