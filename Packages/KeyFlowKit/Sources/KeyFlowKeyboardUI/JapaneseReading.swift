@@ -8,7 +8,7 @@ public enum JapaneseReading {
     public static func reading(of text: String) -> String? {
         let input = text as NSString
         guard input.length > 0 else { return nil }
-        let locale = CFLocaleCreate(kCFAllocatorDefault, "ja_JP" as CFString)
+        let locale = Locale(identifier: "ja_JP") as CFLocale
         guard let tokenizer = CFStringTokenizerCreate(
             kCFAllocatorDefault,
             input as CFString,
