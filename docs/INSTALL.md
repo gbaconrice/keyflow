@@ -33,6 +33,19 @@ App Groupsは、アプリで変えた設定やユーザー辞書をキーボー�
 3. **Sideloadly** を https://sideloadly.io/ から入れます。
 4. iPhoneをUSBケーブルでPCにつなぎ、iPhoneの画面で「このコンピュータを信頼」を選びます。
 
+## 0. GitHubでビルドできるようにする（最初の1回だけ）
+
+ビルドはGitHub Actions（無料）で行います。次のどちらかで、ソースをGitHubのリポジトリに置きます。
+
+**A. Claudeに任せる**: https://claude.ai/connect-github でGitHubアカウントを接続し、Claudeに「接続した」と伝えます。リポジトリの作成とアップロードはClaudeが行います。
+
+**B. 自分でアップロードする**（GitHubアカウントがあれば、Claudeとの接続は不要）
+1. GitHubで新しいリポジトリを作ります（名前は `keyflow` など。PublicにするとGitHub Actionsの実行時間が無制限）。
+2. 受け取った `keyflow-source.zip` を展開します。
+3. リポジトリの画面で「Add file」→「Upload files」を選び、展開した `keyflow` フォルダの**中身**（`App`、`Keyboard`、`Packages`、`.github` などすべて）をドラッグして「Commit changes」を押します。
+   - `.github` フォルダも必ず含めてください。これがビルドの設定です。
+4. 「Actions」タブを開き、ワークフローの実行を許可するボタンが出ていれば押します。数分〜20分ほどでビルドが終わります。
+
 ## 1. IPAを入手する
 
 1. GitHubのリポジトリで「Actions」→「Build」→ 最新の成功した実行を開きます。
