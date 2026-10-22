@@ -77,8 +77,15 @@ public final class CandidateBarView: UIView, UIScrollViewDelegate {
     private let forgetButton = UIButton(type: .system)
     private let forgetCancelButton = UIButton(type: .system)
     private var forgetTarget: (index: Int, requestID: Int)?
+    /// 候補ごとの文字幅（候補が変わったときだけ測る）
+    private var textWidths: [CGFloat] = []
     public var fontSize: CGFloat = 17 {
-        didSet { if oldValue != fontSize { setNeedsLayout() } }
+        didSet {
+            if oldValue != fontSize {
+                reloadCells()
+                setNeedsLayout()
+            }
+        }
     }
 
     public override init(frame: CGRect) {
@@ -175,15 +182,21 @@ public final class CandidateBarView: UIView, UIScrollViewDelegate {
             scrollView.addSubview(cell)
             cells.append(cell)
         }
+        let regular = UIFont.systemFont(ofSize: fontSize)
+        let medium = UIFont.systemFont(ofSize: fontSize, weight: .medium)
+        textWidths = candidates.enumerated().map { i, c in
+            ceil((c.text as NSString).size(withAttributes: [.font: i == 0 ? medium : regular]).width)
+        }
         for (i, cell) in cells.enumerated() {
             if i < candidates.count {
                 cell.isHidden = false
                 cell.index = i
                 cell.label.text = candidates[i].text
-                cell.label.font = .systemFont(ofSize: fontSize, weight: i == 0 ? .medium : .regular)
+                cell.label.font = i == 0 ? medium : regular
                 cell.isSelectedCandidate = i == selectedIndex
             } else {
                 cell.isHidden = true
+                cell.label.text = nil
             }
         }
     }
@@ -235,10 +248,8 @@ public final class CandidateBarView: UIView, UIScrollViewDelegate {
         scrollView.frame = CGRect(x: left, y: 0, width: max(right - left, 0), height: h)
 
         var x: CGFloat = 0
-        let font = UIFont.systemFont(ofSize: fontSize)
-        for (i, cell) in cells.enumerated() where i < candidates.count {
-            let textWidth = (candidates[i].text as NSString).size(withAttributes: [.font: font]).width
-            let w = min(max(ceil(textWidth) + 20, 44), scrollView.bounds.width)
+        for (i, cell) in cells.enumerated() where i < candidates.count && i < textWidths.count {
+            let w = min(max(textWidths[i] + 20, 44), scrollView.bounds.width)
             cell.frame = CGRect(x: x, y: 3, width: w, height: h - 6)
             x += w + 2
         }

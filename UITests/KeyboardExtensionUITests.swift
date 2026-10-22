@@ -31,6 +31,18 @@ final class KeyboardExtensionUITests: XCTestCase {
         app.descendants(matching: .any)["key.\(id)"].firstMatch
     }
 
+    /// 入力欄をタップしてキーボード拡張を出す。初回は拡張の起動に時間がかかることがあるので、出なければもう一度タップする。
+    @discardableResult
+    private func showKeyboard(_ app: XCUIApplication, _ editor: XCUIElement) -> Bool {
+        for _ in 0..<2 {
+            editor.tap()
+            if key(app, "a").waitForExistence(timeout: 15) || key(app, "ro_a").exists {
+                return true
+            }
+        }
+        return false
+    }
+
     private func flick(_ element: XCUIElement, dx: CGFloat, dy: CGFloat) {
         let start = element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: dx, dy: dy)))
@@ -43,14 +55,12 @@ final class KeyboardExtensionUITests: XCTestCase {
         app.buttons["試し打ち"].firstMatch.tap()
         let editor = app.textViews.firstMatch
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
-        editor.tap()
-        // キーボード拡張の起動と、辞書の準備を待つ
-        Thread.sleep(forTimeInterval: 4)
+        let shown = showKeyboard(app, editor)
+        // 辞書の準備を待つ
+        Thread.sleep(forTimeInterval: 3)
         snap(app, "20-extension-shown")
         note("20-hierarchy", app.debugDescription)
-
-        let keyA = key(app, "a")
-        guard keyA.waitForExistence(timeout: 10) else {
+        guard shown else {
             XCTFail("キーボード拡張のキーが見つからない（キーボードが表示されていない可能性）")
             return
         }
@@ -114,8 +124,7 @@ final class KeyboardExtensionUITests: XCTestCase {
         app.buttons["試し打ち"].firstMatch.tap()
         let editor = app.textViews.firstMatch
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
-        editor.tap()
-        guard key(app, "a").waitForExistence(timeout: 10) else {
+        guard showKeyboard(app, editor) else {
             XCTFail("キーボード拡張のキーが見つからない")
             return
         }
@@ -165,8 +174,7 @@ final class KeyboardExtensionUITests: XCTestCase {
         app.buttons["試し打ち"].firstMatch.tap()
         let editor = app.textViews.firstMatch
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
-        editor.tap()
-        guard key(app, "a").waitForExistence(timeout: 10) else {
+        guard showKeyboard(app, editor) else {
             XCTFail("キーボード拡張のキーが見つからない")
             return
         }
@@ -213,8 +221,7 @@ final class KeyboardExtensionUITests: XCTestCase {
         app.buttons["試し打ち"].firstMatch.tap()
         let editor = app.textViews.firstMatch
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
-        editor.tap()
-        guard key(app, "a").waitForExistence(timeout: 10) else {
+        guard showKeyboard(app, editor) else {
             XCTFail("キーボード拡張のキーが見つからない")
             return
         }

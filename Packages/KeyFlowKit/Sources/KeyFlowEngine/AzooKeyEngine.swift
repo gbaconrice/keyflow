@@ -65,6 +65,11 @@ public final class AzooKeyEngine: ConversionEngine {
         )
     }
 
+    /// 1回の変換で返す候補の上限。
+    /// エンジンは1文字でも数百件を返すが、すべてを候補バーに並べると打鍵のたびの描画とメモリが重くなる。
+    /// 候補の一覧で選べる量としては十分な数にする。
+    static let maximumCandidates = 80
+
     public func candidates(for source: String, requestID: Int, options: ConversionOptions) -> CandidateList {
         guard !source.isEmpty else {
             return CandidateList(requestID: requestID, source: source, candidates: [])
@@ -101,6 +106,9 @@ public final class AzooKeyEngine: ConversionEngine {
             let consumed = max(1, total - rest.convertTarget.count)
             candidates.append(ConversionCandidate(text: c.text, consumedCount: consumed, isPrediction: isPrediction, engineIndex: natives.count))
             natives.append(c)
+            if candidates.count >= Self.maximumCandidates {
+                break
+            }
         }
         lastResult = (requestID, composing, natives)
         return CandidateList(requestID: requestID, source: source, candidates: candidates)

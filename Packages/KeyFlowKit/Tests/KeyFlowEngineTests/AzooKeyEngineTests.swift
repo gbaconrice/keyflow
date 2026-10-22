@@ -289,4 +289,12 @@ struct ConversionHeuristicsTests {
             #expect(!top.hasSuffix("作"), "\(reading) → \(top)")
         }
     }
+
+    @Test("候補の数は上限までにする（打鍵のたびの描画とメモリを抑える）")
+    func candidateCountIsCapped() {
+        let engine = AzooKeyEngine(memoryDirectory: makeTempDirectory())
+        let list = engine.candidates(for: "き", requestID: 1, options: .init())
+        #expect(list.candidates.count <= AzooKeyEngine.maximumCandidates)
+        #expect(list.candidates.count >= 20)
+    }
 }
