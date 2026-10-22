@@ -32,6 +32,11 @@ struct RootView: View {
                     } label: {
                         Label("試し打ち", systemImage: "character.cursor.ibeam")
                     }
+                    NavigationLink {
+                        UsageGuideView()
+                    } label: {
+                        Label("使い方", systemImage: "questionmark.circle")
+                    }
                 }
 
                 Section("キーボード") {

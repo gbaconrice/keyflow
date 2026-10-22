@@ -11,7 +11,7 @@ enum ConversionHeuristics {
 
     /// 1位の候補より望ましい表記があれば返す。
     ///
-    /// - 半角数字の後の「次」で、後ろに漢字が続かないもの（「3次に」「10次」）→「時」
+    /// - 数字・「何」の後の「次」で、後ろに漢字が続かないもの（「3次に」「10次」「何次まで」）→「時」
     ///   数字の後の「じ」はほとんどが時刻。半角数字のときだけ「次」に寄る傾向がある。
     ///   「3次元」「2次会」のように漢字が続くものは変えない。
     /// - 「第＋数字」の後の「時」で、後ろに漢字が続くもの（「第2時世界大戦」）→「次」
@@ -21,14 +21,15 @@ enum ConversionHeuristics {
         var changed = false
         for i in chars.indices {
             let previousIsDigit = i > 0 && chars[i - 1].isDigitLike
-            guard previousIsDigit else { continue }
+            let previousIsNan = i > 0 && chars[i - 1] == "何"
+            guard previousIsDigit || previousIsNan else { continue }
             let nextIsKanji = i + 1 < chars.count && chars[i + 1].isKanji
             // 直前の数字の並びの手前が「第」か
             var j = i - 1
             while j >= 0, chars[j].isDigitLike {
                 j -= 1
             }
-            let hasDaiPrefix = j >= 0 && chars[j] == "第"
+            let hasDaiPrefix = previousIsDigit && j >= 0 && chars[j] == "第"
             if chars[i] == "次", !nextIsKanji, !hasDaiPrefix {
                 result[i] = "時"
                 changed = true

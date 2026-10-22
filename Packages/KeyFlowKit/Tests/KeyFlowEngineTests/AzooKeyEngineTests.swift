@@ -208,6 +208,8 @@ struct ConversionHeuristicsTests {
         #expect(ConversionHeuristics.preferredVariant(of: "10次") == "10時")
         #expect(ConversionHeuristics.preferredVariant(of: "夜9次から") == "夜9時から")
         #expect(ConversionHeuristics.preferredVariant(of: "３次まで") == "３時まで")
+        #expect(ConversionHeuristics.preferredVariant(of: "郵便局は何次までですか") == "郵便局は何時までですか")
+        #expect(ConversionHeuristics.preferredVariant(of: "何次元") == nil)
     }
 
     @Test("「3次元」「2次会」「3時間」は変えない")
@@ -245,6 +247,8 @@ struct ConversionHeuristicsTests {
             ("2じのほうていしき", "2次の方程式"),
             ("12じまでまってる", "12時まで待ってる"),
             ("ごご3じにしゅうごう", "午後3時に集合"),
+            ("ゆうびんきょくはなんじまでですか", "郵便局は何時までですか"),
+            ("なんじげん", "何次元"),
         ]
         for (i, (reading, expected)) in cases.enumerated() {
             let list = engine.candidates(for: reading, requestID: i, options: .init(predictionEnabled: false))
