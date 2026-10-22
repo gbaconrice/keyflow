@@ -116,37 +116,53 @@ jobs:
           DEST="$(../../scripts/pick-simulator.sh)"
           xcodebuild test -scheme KeyFlowKit-Package -destination "$DEST" 2>&1 | tee ../../test-package.log | grep -E "error:|✘|Test run|Executed|TEST (SUCCEEDED|FAILED)" || true
           grep -qE "TEST SUCCEEDED|Test run with .* passed" ../../test-package.log
+      - name: Build for simulator tests
+        run: |
+          set -o pipefail
+          DEST="$(scripts/pick-simulator.sh)"
+          echo "SIM_UDID=${DEST##*id=}" >> "$GITHUB_ENV"
+          xcodebuild build-for-testing -project KeyFlow.xcodeproj -scheme KeyFlow -destination "$DEST" \
+            -derivedDataPath build-sim \
+            CODE_SIGN_IDENTITY="-" CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM="" CODE_SIGNING_REQUIRED=NO \
+            KEYFLOW_BUNDLE_ID="$BUNDLE_ID" KEYFLOW_APP_GROUP="$APP_GROUP" \
+            2>&1 | tee build-sim.log | grep -E "error:|BUILD (SUCCEEDED|FAILED)" || true
+          grep -qE "BUILD SUCCEEDED" build-sim.log
       - name: UI tests with screenshots
         continue-on-error: true
         run: |
           set -o pipefail
-          DEST="$(scripts/pick-simulator.sh)"
-          xcodebuild test -project KeyFlow.xcodeproj -scheme KeyFlow -destination "$DEST" \
+          XCTESTRUN="$(ls build-sim/Build/Products/*.xctestrun | head -1)"
+          xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination "id=$SIM_UDID" \
             -skip-testing:KeyFlowUITests/KeyboardExtensionUITests \
-            -resultBundlePath TestResults.xcresult CODE_SIGNING_ALLOWED=NO \
-            2>&1 | tee test-ui.log | grep -E "error:|Test Case|TEST (SUCCEEDED|FAILED)" || true
-          grep -q "TEST SUCCEEDED" test-ui.log
+            -resultBundlePath TestResults.xcresult \
+            2>&1 | tee test-ui.log | grep -E "error:|Test Case|TEST (EXECUTE )?(SUCCEEDED|FAILED)" || true
+          grep -qE "TEST (EXECUTE )?SUCCEEDED" test-ui.log
       - name: Keyboard extension as the system keyboard (simulator)
         continue-on-error: true
         run: |
           set -o pipefail
-          DEST="$(scripts/pick-simulator.sh)"
-          UDID="${DEST##*id=}"
-          xcrun simctl shutdown "$UDID" 2>/dev/null || true
+          XCTESTRUN="$(ls build-sim/Build/Products/*.xctestrun | head -1)"
+          APP="$(ls -d build-sim/Build/Products/*-iphonesimulator/KeyFlow.app | head -1)"
+          xcrun simctl shutdown "$SIM_UDID" 2>/dev/null || true
           # ソフトウェアキーボードを表示させる（ハードウェアキーボード接続扱いを解除）
           defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool false
-          xcrun simctl boot "$UDID"
-          xcrun simctl bootstatus "$UDID" -b
-          # KeyFlowだけを文字入力用のキーボードとして登録する
-          xcrun simctl spawn "$UDID" defaults write -g AppleKeyboards -array "${BUNDLE_ID}.keyboard" "emoji@sw=Emoji"
-          xcrun simctl spawn "$UDID" defaults write -g AppleKeyboardsExpanded -int 1
-          xcodebuild test -project KeyFlow.xcodeproj -scheme KeyFlow -destination "id=$UDID" \
+          xcrun simctl boot "$SIM_UDID"
+          xcrun simctl bootstatus "$SIM_UDID" -b
+          # 先にアプリを入れておかないと、キーボードの登録が無効として捨てられる
+          xcrun simctl install "$SIM_UDID" "$APP"
+          xcrun simctl spawn "$SIM_UDID" defaults write -g AppleKeyboards -array "${BUNDLE_ID}.keyboard" "emoji@sw=Emoji"
+          xcrun simctl spawn "$SIM_UDID" defaults write -g AppleKeyboardsExpanded -int 1
+          # 設定を確実に読み直させるため再起動する
+          xcrun simctl shutdown "$SIM_UDID"
+          xcrun simctl boot "$SIM_UDID"
+          xcrun simctl bootstatus "$SIM_UDID" -b
+          echo "AppleKeyboards:"; xcrun simctl spawn "$SIM_UDID" defaults read -g AppleKeyboards || true
+          xcodebuild test-without-building -xctestrun "$XCTESTRUN" -destination "id=$SIM_UDID" \
             -only-testing:KeyFlowUITests/KeyboardExtensionUITests \
             -resultBundlePath ExtensionResults.xcresult \
-            CODE_SIGN_IDENTITY="-" CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM="" CODE_SIGNING_REQUIRED=NO \
-            KEYFLOW_BUNDLE_ID="$BUNDLE_ID" KEYFLOW_APP_GROUP="$APP_GROUP" \
-            2>&1 | tee test-extension.log | grep -E "error:|Test Case|XCTAssert|TEST (SUCCEEDED|FAILED)" || true
-          grep -q "TEST SUCCEEDED" test-extension.log
+            2>&1 | tee test-extension.log | grep -E "error:|Test Case|TEST (EXECUTE )?(SUCCEEDED|FAILED)" || true
+          echo "AppleKeyboards after:"; xcrun simctl spawn "$SIM_UDID" defaults read -g AppleKeyboards || true
+          grep -qE "TEST (EXECUTE )?SUCCEEDED" test-extension.log
       - name: Export screenshots
         if: always()
         run: |
@@ -171,5 +187,6 @@ jobs:
           path: |
             build-device.log
             test-package.log
+            build-sim.log
             test-ui.log
             test-extension.log

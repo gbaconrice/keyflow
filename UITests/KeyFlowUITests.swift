@@ -91,4 +91,43 @@ final class KeyFlowUITests: XCTestCase {
             snap(app, "11-one-handed-right")
         }
     }
+
+    func testPanels() {
+        let app = XCUIApplication()
+        app.launch()
+        openLayoutSettings(app)
+
+        // 記号・顔文字の一覧
+        let symbols = app.buttons["記号と顔文字"].firstMatch
+        if symbols.waitForExistence(timeout: 3) {
+            symbols.tap()
+            snap(app, "12-symbols")
+            app.buttons["顔文字"].firstMatch.tap()
+            snap(app, "13-kaomoji")
+            app.buttons["閉じる"].firstMatch.tap()
+        } else {
+            XCTFail("記号と顔文字のボタンが見つからない")
+        }
+
+        // キーボード上の調整パネル
+        let adjust = app.buttons["キーボードの調整"].firstMatch
+        if adjust.waitForExistence(timeout: 3) {
+            adjust.tap()
+            snap(app, "14-quick-settings")
+            app.buttons["完了"].firstMatch.tap()
+        } else {
+            XCTFail("キーボードの調整ボタンが見つからない")
+        }
+
+        // 候補の一覧（入力中に右端のボタン）
+        key(app, "ka").tap()
+        flick(key(app, "wa"), dx: 0, dy: -40)
+        let expand = app.buttons["候補をすべて表示"].firstMatch
+        if expand.waitForExistence(timeout: 3) {
+            expand.tap()
+            snap(app, "15-candidate-grid")
+        } else {
+            XCTFail("候補をすべて表示のボタンが見つからない")
+        }
+    }
 }
