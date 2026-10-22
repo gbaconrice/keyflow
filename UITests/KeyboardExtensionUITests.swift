@@ -48,6 +48,29 @@ final class KeyboardExtensionUITests: XCTestCase {
         start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: dx, dy: dy)))
     }
 
+    /// 最初に実行する準備（テスト名の順に実行される）。
+    /// シミュレーターを起動し直した直後は、キーボード拡張の起動に時間がかかり、最初のテストだけキーが見つからないことがあるため、
+    /// ここで一度キーボードを出して待つ。ここでは失敗にしない（出なければ後のテストで分かる）。
+    func testA0WarmUpKeyboard() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["-KeyFlowResetSettings"]
+        app.launch()
+        app.buttons["試し打ち"].firstMatch.tap()
+        let editor = app.textViews.firstMatch
+        guard editor.waitForExistence(timeout: 10) else { return }
+        for attempt in 1...3 {
+            editor.tap()
+            if key(app, "a").waitForExistence(timeout: 30) {
+                note("00-warmup", "キーボードが出た（\(attempt)回目）")
+                // 辞書の準備も済ませておく
+                Thread.sleep(forTimeInterval: 3)
+                return
+            }
+        }
+        note("00-warmup", "キーボードが出なかった")
+        snap(app, "00-warmup-failed")
+    }
+
     func testTypingWithSystemKeyboard() throws {
         let app = XCUIApplication()
         app.launchArguments += ["-KeyFlowResetSettings"]

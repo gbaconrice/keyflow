@@ -68,6 +68,8 @@ engine.warmUp()
 let warmUpTime = Date().timeIntervalSince(startup)
 
 var keystrokeTimes: [Double] = []
+/// 時間のかかった打鍵（入力途中の読みと時間）
+var slowKeystrokes: [(input: String, ms: Double)] = []
 var stats: [String: (n: Int, top1: Int, top3: Int, top10: Int, learned: Int)] = [:]
 var misses: [String] = []
 var requestID = 0
@@ -80,7 +82,9 @@ for row in rows {
         requestID += 1
         let t = Date()
         final = engine.candidates(for: String(chars[0..<i]), requestID: requestID, options: options)
-        keystrokeTimes.append(Date().timeIntervalSince(t) * 1000)
+        let ms = Date().timeIntervalSince(t) * 1000
+        keystrokeTimes.append(ms)
+        slowKeystrokes.append((String(chars[0..<i]), ms))
     }
     let conversions = final.candidates.filter { !$0.isPrediction && $0.consumedCount == chars.count }
     let rank = conversions.firstIndex { row.answers.contains($0.text) }
@@ -127,6 +131,8 @@ print("\n## 応答時間（1打鍵ごとの変換, \(keystrokeTimes.count)回）
 print(String(format: "- 平均 %.1f ms / 中央値 %.1f ms / 95%%点 %.1f ms / 最大 %.1f ms", keystrokeTimes.reduce(0, +) / Double(max(keystrokeTimes.count, 1)), percentile(keystrokeTimes, 0.5), percentile(keystrokeTimes, 0.95), keystrokeTimes.max() ?? 0))
 print(String(format: "- 初回の準備（warmUp）: %.0f ms", warmUpTime * 1000))
 print(String(format: "- プロセスの最大メモリ使用量: %.1f MB", peakMemoryMB()))
+let slowest = slowKeystrokes.sorted { $0.ms > $1.ms }.prefix(5)
+print("- 時間のかかった打鍵: " + slowest.map { String(format: "%@ %.0f ms", $0.input, $0.ms) }.joined(separator: " / "))
 print("\n## 1位で正解しなかった例\n")
 misses.forEach { print($0) }
 try? FileManager.default.removeItem(at: memory)
