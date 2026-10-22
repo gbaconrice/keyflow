@@ -61,10 +61,17 @@ struct LayoutSettingsView: View {
                 SliderRow(title: "候補の文字の大きさ", value: $model.settings.candidateFontSize, range: KeyboardSettings.Ranges.candidateFontSize)
             }
             Section {
-                Picker("片手モード", selection: $model.settings.oneHandedMode) {
-                    Text("オフ").tag(OneHandedMode.off)
-                    Text("左手").tag(OneHandedMode.left)
-                    Text("右手").tag(OneHandedMode.right)
+                HStack {
+                    Text("片手モード")
+                    Spacer()
+                    Picker("片手モード", selection: $model.settings.oneHandedMode) {
+                        Text("左手").tag(OneHandedMode.left)
+                        Text("オフ").tag(OneHandedMode.off)
+                        Text("右手").tag(OneHandedMode.right)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .fixedSize()
                 }
                 SliderRow(title: "片手モードの幅", value: $model.settings.oneHandedWidthRatio, range: KeyboardSettings.Ranges.oneHandedWidthRatio, step: 0.01) { "\(Int(($0 * 100).rounded()))%" }
                 SliderRow(title: "横画面の幅", value: $model.settings.landscapeWidthRatio, range: KeyboardSettings.Ranges.landscapeWidthRatio, step: 0.01) { "\(Int(($0 * 100).rounded()))%" }
@@ -108,6 +115,10 @@ struct InputSettingsView: View {
                     Text("12キー（フリック）").tag(KanaLayout.flick)
                     Text("ローマ字（QWERTY）").tag(KanaLayout.romaji)
                 }
+                .pickerStyle(.inline)
+                .labelsHidden()
+            } header: {
+                Text("日本語の配列")
             } footer: {
                 Text("ローマ字では、nの次に母音以外を打つと「ん」になります。母音の前の「ん」は nn と打ちます。")
             }

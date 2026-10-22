@@ -25,13 +25,39 @@ final class ProxyTextDocument: TextDocument {
     func unmarkText() { proxy?.unmarkText() }
 }
 
+/// 変換エンジンはプロセスに1つだけ置く。
+///
+/// iOSはキーボードを表示するたびに新しい`KeyboardViewController`を作るが、拡張のプロセスは使い回す。
+/// そのたびにエンジンを作ると辞書の準備をやり直すうえ、古いものが解放されるまでメモリが重複する。
+/// 変換はすべて同じ直列キュー（`scheduler`）で行うので、複数のコントローラーから使ってもエンジンへのアクセスは直列になる。
+/// メインスレッドからのみ触る。
+private enum SharedConversion {
+    static let scheduler = DispatchTaskScheduler()
+    private static var engine: AzooKeyEngine?
+    /// 最後に読み込んだユーザー辞書（同じ内容を読み込み直さないため）
+    static var userDictionaryFingerprint: Int?
+
+    /// 共有のエンジン。初めて作ったときは`isNew`がtrue。
+    static func engine(store: SettingsStore, versionString: String) -> (engine: AzooKeyEngine, isNew: Bool) {
+        if let engine {
+            return (engine, false)
+        }
+        // 学習データはキーボード自身の領域に置く（フルアクセスなしではApp Groupに書き込めないため）
+        let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+        let memoryDirectory = library.appendingPathComponent("KeyFlowLearning", isDirectory: true)
+        let created = AzooKeyEngine(memoryDirectory: memoryDirectory, sharedDirectory: store.sharedContainerURL, versionString: versionString)
+        engine = created
+        return (created, true)
+    }
+}
+
 final class KeyboardViewController: UIInputViewController {
     private var session: KeyboardSession?
     private var conversion: ConversionQueue?
     private var store: SettingsStore?
     private var heightConstraint: NSLayoutConstraint?
     private var lastDocumentIdentifier: UUID?
-    private var userDictionaryFingerprint: Int?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -39,15 +65,16 @@ final class KeyboardViewController: UIInputViewController {
         self.store = store
         let settings = store.loadEffectiveSettings()
 
-        // 学習データはキーボード自身の領域に置く（フルアクセスなしではApp Groupに書き込めないため）
-        let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first
-            ?? FileManager.default.temporaryDirectory
-        let memoryDirectory = library.appendingPathComponent("KeyFlowLearning", isDirectory: true)
-        let engine = AzooKeyEngine(memoryDirectory: memoryDirectory, sharedDirectory: store.sharedContainerURL, versionString: "KeyFlow \(Self.appVersion)")
-        let conversion = ConversionQueue(engine: engine, scheduler: DispatchTaskScheduler())
+        let (engine, isNew) = SharedConversion.engine(store: store, versionString: "KeyFlow \(Self.appVersion)")
+        let conversion = ConversionQueue(engine: engine, scheduler: SharedConversion.scheduler)
         self.conversion = conversion
-        conversion.perform { engine in
-            (engine as? AzooKeyEngine)?.warmUp()
+        if isNew {
+            conversion.perform { engine in
+                (engine as? AzooKeyEngine)?.warmUp()
+            }
+        } else {
+            // 前の表示で入力途中だった状態が残らないようにする
+            conversion.resetComposition()
         }
 
         let controller = InputController(settings: settings, conversion: conversion)
@@ -224,8 +251,8 @@ final class KeyboardViewController: UIInputViewController {
         var hasher = Hasher()
         hasher.combine(entries)
         let fingerprint = hasher.finalize()
-        guard fingerprint != userDictionaryFingerprint else { return }
-        userDictionaryFingerprint = fingerprint
+        guard fingerprint != SharedConversion.userDictionaryFingerprint else { return }
+        SharedConversion.userDictionaryFingerprint = fingerprint
         conversion.updateUserDictionary(entries)
     }
 }

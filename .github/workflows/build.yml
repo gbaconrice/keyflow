@@ -158,13 +158,24 @@ jobs:
           xcrun simctl bootstatus "$SIM_UDID" -b
           echo "AppleKeyboards:"; xcrun simctl spawn "$SIM_UDID" defaults read -g AppleKeyboards || true
           # テスト中のキーボード拡張のメモリ使用量を1秒ごとに記録する（シミュレーターの値で、実機とは異なる）
+          # 30秒ごとに、残っているコントローラー・エンジンの数（解放漏れの確認）と、メモリの内訳も残す
           (
+            N=0
             while true; do
               PID="$(pgrep -f 'KeyFlowKeyboard.appex/KeyFlowKeyboard' | head -1 || true)"
               if [ -n "$PID" ]; then
-                FP="$(sudo vmmap --summary "$PID" 2>/dev/null | grep -E '^Physical footprint' | tr -s ' ' | paste -sd ';' - || true)"
+                sudo vmmap --summary "$PID" > vmmap.tmp 2>/dev/null || true
+                FP="$(grep -E '^Physical footprint' vmmap.tmp | tr -s ' ' | paste -sd ';' - || true)"
                 RSS="$(ps -o rss= -p "$PID" 2>/dev/null | tr -d ' ' || true)"
                 echo "$(date +%T) pid=$PID rss_kb=$RSS $FP" >> extension-memory.log
+                [ -s vmmap.tmp ] && cp vmmap.tmp extension-vmmap-latest.txt
+                if [ $((N % 3)) -eq 0 ]; then
+                  {
+                    echo "== $(date +%T) pid=$PID"
+                    sudo heap "$PID" 2>/dev/null | grep -E 'KeyboardViewController|AzooKeyEngine|KanaKanjiConverter|DicdataStore|KeyboardSession|InputController' || true
+                  } >> extension-heap.log
+                fi
+                N=$((N + 1))
               fi
               sleep 1
             done
@@ -215,3 +226,5 @@ jobs:
             test-ui.log
             test-extension.log
             extension-memory.log
+            extension-heap.log
+            extension-vmmap-latest.txt

@@ -87,12 +87,18 @@ final class KeyFlowUITests: XCTestCase {
         snap(app, "10-input-settings")
         app.navigationBars.buttons.element(boundBy: 0).tap()
         openLayoutSettings(app)
-        // 片手モード（右）に切り替える
-        let picker = app.buttons["片手モード"].firstMatch
-        if picker.waitForExistence(timeout: 2) {
-            picker.tap()
-            app.buttons["右手"].firstMatch.tap()
+        // 片手モード（右）に切り替える（下の方にあるので、見えるまでスクロールする）
+        let right = app.buttons["右手"].firstMatch
+        var swipes = 0
+        while !(right.exists && right.isHittable), swipes < 6 {
+            app.swipeUp()
+            swipes += 1
+        }
+        if right.waitForExistence(timeout: 2) {
+            right.tap()
             snap(app, "11-one-handed-right")
+        } else {
+            XCTFail("片手モードの選択肢が見つからない")
         }
     }
 
@@ -102,13 +108,12 @@ final class KeyFlowUITests: XCTestCase {
         app.launchArguments += ["-KeyFlowResetSettings"]
         app.launch()
         app.buttons["入力操作"].firstMatch.tap()
-        let picker = app.buttons["日本語の配列"].firstMatch
-        guard picker.waitForExistence(timeout: 5) else {
-            XCTFail("日本語の配列の選択が見つからない")
+        let romaji = app.buttons["ローマ字（QWERTY）"].firstMatch
+        guard romaji.waitForExistence(timeout: 5) else {
+            XCTFail("日本語の配列の選択肢が見つからない")
             return
         }
-        picker.tap()
-        app.buttons["ローマ字（QWERTY）"].firstMatch.tap()
+        romaji.tap()
         guard key(app, "ro_k").waitForExistence(timeout: 5) else {
             XCTFail("ローマ字の配列に切り替わらない")
             return
@@ -117,7 +122,6 @@ final class KeyFlowUITests: XCTestCase {
             key(app, "ro_\(c)").tap()
         }
         snap(app, "15-romaji-preview")
-        picker.tap()
         app.buttons["12キー（フリック）"].firstMatch.tap()
     }
 

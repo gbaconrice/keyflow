@@ -55,6 +55,20 @@ public final class ConversionQueue {
     /// メインスレッドからのみ触る
     private(set) public var latestRequestID = 0
 
+    /// 要求IDはプロセス全体で重ならないように振る。
+    /// キーボードを表示し直すと、同じエンジンを新しいキューから使うため（エンジンは直近の結果をIDで照合する）。
+    private static let idLock = NSLock()
+    nonisolated(unsafe) private static var lastIssuedID = 0
+
+    @discardableResult
+    private func issueRequestID() -> Int {
+        Self.idLock.lock()
+        defer { Self.idLock.unlock() }
+        Self.lastIssuedID += 1
+        latestRequestID = Self.lastIssuedID
+        return latestRequestID
+    }
+
     /// 変換結果（メインスレッドで呼ばれる）
     public var onCandidates: ((CandidateList) -> Void)?
 
@@ -66,8 +80,7 @@ public final class ConversionQueue {
     /// 変換を非同期に要求する
     @discardableResult
     public func request(source: String, options: ConversionOptions) -> Int {
-        latestRequestID += 1
-        let id = latestRequestID
+        let id = issueRequestID()
         lock.lock()
         pending = (id, source, options)
         lock.unlock()
@@ -92,8 +105,7 @@ public final class ConversionQueue {
 
     /// 変換結果がすぐに必要な場合（結果が届く前に「次候補」を押した場合など）
     public func requestAndWait(source: String, options: ConversionOptions) -> CandidateList {
-        latestRequestID += 1
-        let id = latestRequestID
+        let id = issueRequestID()
         lock.lock()
         pending = nil
         lock.unlock()
@@ -104,8 +116,7 @@ public final class ConversionQueue {
 
     /// 確定後の次の語の候補を非同期に要求する
     public func requestNextWord(after candidate: ConversionCandidate, options: ConversionOptions) {
-        latestRequestID += 1
-        let id = latestRequestID
+        let id = issueRequestID()
         lock.lock()
         pending = nil
         lock.unlock()
@@ -121,7 +132,7 @@ public final class ConversionQueue {
 
     /// 処理待ちの要求を取り消し、届く予定の結果も捨てる
     public func cancel() {
-        latestRequestID += 1
+        issueRequestID()
         lock.lock()
         pending = nil
         lock.unlock()
