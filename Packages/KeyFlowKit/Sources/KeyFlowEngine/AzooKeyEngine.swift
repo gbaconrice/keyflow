@@ -74,7 +74,11 @@ public final class AzooKeyEngine: ConversionEngine {
 
         // 並び順: 入力全体の変換の1位 → 予測（最大3件）→ 残りの変換 → 残りの予測
         // 「変換」キーでは予測を飛ばして変換候補だけを巡回する（InputController側）
-        let exact = result.mainResults.filter { $0.inputable && !$0.text.isEmpty }
+        let exact = ConversionHeuristics.reorder(
+            result.mainResults.filter { $0.inputable && !$0.text.isEmpty },
+            text: { $0.text },
+            score: { $0.value }
+        )
         let predictions = result.predictionResults.filter { $0.inputable && !$0.text.isEmpty }
         var ordered: [(Candidate, Bool)] = []
         ordered += exact.prefix(1).map { ($0, false) }

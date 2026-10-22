@@ -180,3 +180,56 @@ struct EndToEndTests {
         #expect(env.field.text == "今日はいい天気ですね")
     }
 }
+
+@Suite("変換の補正")
+struct ConversionHeuristicsTests {
+    @Test("数字の後の「次」は、後ろに漢字が続かなければ「時」にする")
+    func digitJi() {
+        #expect(ConversionHeuristics.preferredVariant(of: "3次に駅前") == "3時に駅前")
+        #expect(ConversionHeuristics.preferredVariant(of: "10次") == "10時")
+        #expect(ConversionHeuristics.preferredVariant(of: "夜9次から") == "夜9時から")
+        #expect(ConversionHeuristics.preferredVariant(of: "３次まで") == "３時まで")
+    }
+
+    @Test("「3次元」「2次会」「3時間」は変えない")
+    func keepCompounds() {
+        #expect(ConversionHeuristics.preferredVariant(of: "3次元") == nil)
+        #expect(ConversionHeuristics.preferredVariant(of: "2次会") == nil)
+        #expect(ConversionHeuristics.preferredVariant(of: "3時間") == nil)
+        #expect(ConversionHeuristics.preferredVariant(of: "次に") == nil)
+    }
+
+    @Test("「第＋数字＋時＋漢字」は「次」にする")
+    func daiJi() {
+        #expect(ConversionHeuristics.preferredVariant(of: "第2時世界大戦") == "第2次世界大戦")
+        #expect(ConversionHeuristics.preferredVariant(of: "第3次産業") == nil)
+    }
+
+    @Test("点数差が大きいとき（学習済みなど）は並べ替えない")
+    func scoreGate() {
+        let close = [("3次に", Float(-10.0)), ("3時に", Float(-10.5))]
+        #expect(ConversionHeuristics.reorder(close, text: { $0.0 }, score: { $0.1 }).first?.0 == "3時に")
+        let far = [("3次に", Float(-10.0)), ("3時に", Float(-12.0))]
+        #expect(ConversionHeuristics.reorder(far, text: { $0.0 }, score: { $0.1 }).first?.0 == "3次に")
+    }
+
+    @Test("実際の変換で直る")
+    func endToEnd() {
+        let engine = AzooKeyEngine(memoryDirectory: makeTempDirectory())
+        let cases = [
+            ("3じにえきまえ", "3時に駅前"),
+            ("よる9じから", "夜9時から"),
+            ("12じ", "12時"),
+            ("3じげん", "3次元"),
+            ("2じかい", "2次会"),
+            ("だい2じせかいたいせん", "第2次世界大戦"),
+            ("2じのほうていしき", "2次の方程式"),
+            ("12じまでまってる", "12時まで待ってる"),
+            ("ごご3じにしゅうごう", "午後3時に集合"),
+        ]
+        for (i, (reading, expected)) in cases.enumerated() {
+            let list = engine.candidates(for: reading, requestID: i, options: .init(predictionEnabled: false))
+            #expect(list.candidates.first?.text == expected, "\(reading)")
+        }
+    }
+}
