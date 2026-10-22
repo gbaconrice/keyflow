@@ -52,6 +52,7 @@ App Groupsは、アプリで変えた設定やユーザー辞書をキーボー�
 
 - https://github.com/tanabe0422/keyflow/releases/download/latest/KeyFlow.ipa
 - 更新日時や内容は https://github.com/tanabe0422/keyflow/releases/tag/latest で確認できます。
+- リリースの題名にある「ビルド番号」は、インストール後にアプリの画面下に出る版（例: `KeyFlow 0.1.0 (25)`）の括弧内の数字と同じです。どのビルドを入れたか確かめるときに使います。
 
 うまく取れないときは、GitHubの「Actions」→「Build」→ 最新の成功した実行 →「Artifacts」の `KeyFlow-ipa` からも入手できます（zipを展開すると `KeyFlow.ipa` が出てきます）。
 

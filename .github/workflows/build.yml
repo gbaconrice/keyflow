@@ -176,8 +176,11 @@ jobs:
                 if [ $((N % 3)) -eq 0 ]; then
                   {
                     echo "== $(date +%T) pid=$PID"
-                    sudo heap "$PID" 2>/dev/null | grep -E 'KeyboardViewController|AzooKeyEngine|KanaKanjiConverter|DicdataStore|KeyboardSession|InputController' || true
+                    sudo heap -s "$PID" > heap.tmp 2>/dev/null || true
+                    grep -E 'KeyboardViewController|AzooKeyEngine|KanaKanjiConverter|DicdataStore|KeyboardSession|InputController' heap.tmp || true
                   } >> extension-heap.log
+                  # 大きさ順の内訳（最後の計測を残す）
+                  [ -s heap.tmp ] && head -80 heap.tmp > extension-heap-top.txt
                 fi
                 N=$((N + 1))
               fi
@@ -232,3 +235,4 @@ jobs:
             extension-memory.log
             extension-heap.log
             extension-vmmap-latest.txt
+            extension-heap-top.txt

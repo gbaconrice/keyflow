@@ -496,6 +496,20 @@ struct EnglishSuggestionTests {
         #expect(h.candidates.isEmpty)
     }
 
+    @Test("候補で付いた空白の直後の句読点は、空白を消してから入る")
+    func punctuationAfterSuggestion() {
+        let h = harness()
+        for c in "hel" { h.controller.character(String(c)) }
+        h.controller.selectCandidate(at: 0, requestID: h.controller.state.candidateRequestID)
+        #expect(h.field.text == "hello ")
+        h.controller.character(".")
+        #expect(h.field.text == "hello.")
+        // 自分で打った空白は消さない
+        h.controller.space()
+        h.controller.character(",")
+        #expect(h.field.text == "hello. ,")
+    }
+
     @Test("大文字で始めた単語には、大文字で始まる候補を出す")
     func matchesCase() {
         let h = harness()

@@ -111,6 +111,8 @@ public final class InputController {
     /// 英字で打っている途中の単語から、候補の単語を返す。iOSでは`UITextChecker`とユーザ辞書の短縮形を使う。
     public var wordSuggester: ((String) -> [String])?
     private var fieldKind: InputFieldKind = .normal
+    /// 直前に英単語の候補を選んで、空白を自動で付けた
+    private var suggestionSpacePending = false
 
     private struct ToggleState {
         var keyID: String
@@ -152,12 +154,14 @@ public final class InputController {
 
     /// フリックキー（かな・数字・記号）
     public func flick(keyID: String, spec: FlickKeySpec, direction: FlickDirection) {
+        let spacePending = suggestionSpacePending
         beginKeyAction()
         guard let output = spec.output(for: direction) else {
             return
         }
         let t = now()
         if mode == .english {
+            removeSuggestionSpace(before: output, pending: spacePending)
             flickDirect(keyID: keyID, spec: spec, direction: direction, output: output, time: t)
             return
         }
@@ -248,6 +252,7 @@ public final class InputController {
 
     /// 文字キー（英字QWERTY・ローマ字入力）
     public func character(_ text: String) {
+        let spacePending = suggestionSpacePending
         beginKeyAction()
         if mode == .kana {
             romajiCharacter(text)
@@ -264,10 +269,20 @@ public final class InputController {
                 shift = .off
             }
         }
+        removeSuggestionSpace(before: output, pending: spacePending)
         insertDirect(output)
         updateAutoShift()
         updateWordSuggestions()
         rebuildState()
+    }
+
+    /// 候補を選んで自動で付けた空白の直後に句読点を打ったら、空白を消してから入れる（"hello ." → "hello."）
+    private func removeSuggestionSpace(before text: String, pending: Bool) {
+        guard pending, [".", ",", "!", "?", ":", ";"].contains(text), composition.isEmpty,
+              let document, document.documentContextBeforeInput?.hasSuffix(" ") == true else {
+            return
+        }
+        document.deleteBackward()
     }
 
     /// ローマ字入力の文字キー。小文字の英字はローマ字として読み、それ以外（シフト中の大文字・「ー」）はそのまま入れる。
@@ -398,6 +413,7 @@ public final class InputController {
         document.insertText(text + " ")
         recordExpectedContext()
         candidateList = .empty
+        suggestionSpacePending = true
         updateAutoShift()
         rebuildState()
     }
@@ -681,6 +697,8 @@ public final class InputController {
             expectedContext = (document?.documentContextBeforeInput, document?.documentContextAfterInput, expected.time)
             return
         }
+        // 入力欄をタップした等。候補で付けた空白はもう直前にはない
+        suggestionSpacePending = false
         if composition.isEmpty && displayedPlainText.isEmpty {
             // 入力中でなければ、予測候補と「取消」を消し、テキストが選択されていれば再変換の候補を出す
             clearIdleCandidates()
@@ -718,6 +736,7 @@ public final class InputController {
     /// キー操作の始めに呼ぶ
     private func beginKeyAction() {
         reconversion = nil
+        suggestionSpacePending = false
         verifyDocumentState()
     }
 
