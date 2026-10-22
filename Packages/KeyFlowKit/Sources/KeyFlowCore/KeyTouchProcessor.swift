@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(CoreGraphics)
+import CoreGraphics
+#endif
 
 /// キーを押したときに起こす操作
 public enum KeyAction: Equatable, Sendable {

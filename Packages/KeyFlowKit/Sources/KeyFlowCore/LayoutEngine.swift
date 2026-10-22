@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(CoreGraphics)
+import CoreGraphics
+#endif
 
 /// レイアウト計算の入力
 public struct LayoutContext: Sendable, Equatable {
