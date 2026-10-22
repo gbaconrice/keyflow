@@ -73,7 +73,7 @@ open class UIResponder: NSObject {
     open func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {}
 }
 open class UIEvent: NSObject {}
-open class UITouch: NSObject { open func location(in view: UIView?) -> CGPoint { .zero } }
+open class UITouch: NSObject { open func location(in view: UIView?) -> CGPoint { .zero }; open var timestamp: TimeInterval { 0 } }
 public enum UIAccessibilityTraitsEnum {}
 public struct UIAccessibilityTraits: OptionSet { public let rawValue: UInt64; public init(rawValue: UInt64) { self.rawValue = rawValue }; public static let keyboardKey = UIAccessibilityTraits(rawValue: 1) }
 open class UIAccessibilityElement: NSObject {

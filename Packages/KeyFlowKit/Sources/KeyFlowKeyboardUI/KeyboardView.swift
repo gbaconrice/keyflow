@@ -2,23 +2,6 @@
 import UIKit
 import KeyFlowCore
 
-/// キーを押したときに起こす操作
-public enum KeyAction: Equatable {
-    case flick(keyID: String, spec: FlickKeySpec, direction: FlickDirection)
-    case character(String)
-    case modifier(FlickDirection)
-    case delete
-    case space
-    case enter
-    case cursorLeft
-    case cursorRight
-    case moveCursor(Int)
-    case shift
-    case switchMode(KeyboardMode)
-    case setOneHandedMode(OneHandedMode)
-    case toggleCase
-}
-
 public protocol KeyboardViewDelegate: AnyObject {
     func keyboardView(_ view: KeyboardView, perform action: KeyAction)
     /// キーに触れた瞬間（振動・クリック音のため）
@@ -46,34 +29,12 @@ public final class KeyboardView: UIView {
     public let globeButton = UIButton(type: .custom)
     private let oneHandedBar = UIStackView()
 
-    private final class TouchState {
-        var key: LaidOutKey
-        let start: CGPoint
-        var current: CGPoint
-        var direction: FlickDirection = .center
-        var repeatTimer: Timer?
-        var holdTimer: Timer?
-        var isDraggingCursor = false
-        var dragAnchorX: CGFloat = 0
-        var finished = false
-        var showsAllGuide = false
-
-        init(key: LaidOutKey, start: CGPoint) {
-            self.key = key
-            self.start = start
-            self.current = start
-        }
-
-        func invalidateTimers() {
-            repeatTimer?.invalidate()
-            repeatTimer = nil
-            holdTimer?.invalidate()
-            holdTimer = nil
-        }
-    }
-
-    private var touchStates: [ObjectIdentifier: TouchState] = [:]
-    private var classifier: FlickClassifier { FlickClassifier(threshold: settings.flickThreshold) }
+    /// タッチ列をキー操作に変える処理（UIKit非依存。KeyFlowCoreでテスト済み）
+    private let processor = KeyTouchProcessor()
+    /// 長押し・連続動作のための時計。処理待ちのタッチがある間だけ動かす。
+    private var ticker: Timer?
+    /// 空白キーでカーソル移動中の表示をしているか
+    private var showsCursorDragLabel = false
 
     public init(spec: KeyboardLayoutSpec, settings: KeyboardSettings) {
         self.spec = spec
@@ -96,6 +57,18 @@ public final class KeyboardView: UIView {
         oneHandedBar.distribution = .equalSpacing
         oneHandedBar.isHidden = true
 
+        processor.config = KeyTouchProcessor.Config(settings: settings)
+        processor.onAction = { [weak self] action in
+            self?.perform(action)
+        }
+        processor.onTouchDown = { [weak self] in
+            guard let self else { return }
+            self.delegate?.keyboardViewDidTouchDown(self)
+        }
+        processor.onVisualChange = { [weak self] visual in
+            self?.applyVisual(visual)
+        }
+
         rebuildKeys()
         addSubview(globeButton)
         addSubview(oneHandedBar)
@@ -115,8 +88,9 @@ public final class KeyboardView: UIView {
         self.spec = spec
         self.settings = settings
         self.isLandscape = isLandscape
+        processor.config = KeyTouchProcessor.Config(settings: settings)
         if specChanged {
-            cancelAllTouches()
+            processor.cancelAll()
             rebuildKeys()
         }
         if layoutChanged {
@@ -130,6 +104,8 @@ public final class KeyboardView: UIView {
     public func apply(state: InputViewState) {
         guard state != self.state else { return }
         self.state = state
+        processor.isShiftActive = state.shift != .off
+        processor.isEnterDisabled = state.enterKeyDisabled
         refreshDynamicKeys()
         for key in spec.keys {
             elementsByID[key.id]?.accessibilityLabel = accessibilityName(for: key)
@@ -165,6 +141,7 @@ public final class KeyboardView: UIView {
             }
             let context = LayoutContext(width: Double(bounds.width), isLandscape: isLandscape, settings: s)
             geometry = LayoutEngine.layout(spec, context: context)
+            processor.geometry = geometry
         }
         guard let geometry else { return }
         for key in geometry.keys {
@@ -379,232 +356,93 @@ public final class KeyboardView: UIView {
 
     // MARK: - タッチ処理
 
-    public override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        for touch in touches {
-            let point = touch.location(in: self)
-            guard let key = geometry?.key(at: point) else { continue }
-            if case .nextKeyboard = key.definition.kind {
-                continue
-            }
-            // ロールオーバー: 先に押されている文字キーを確定してから次のキーを扱う
-            finishPendingCharacterTouches()
+    private func touchID(_ touch: UITouch) -> Int {
+        ObjectIdentifier(touch).hashValue
+    }
 
-            let ts = TouchState(key: key, start: point)
-            touchStates[ObjectIdentifier(touch)] = ts
-            delegate?.keyboardViewDidTouchDown(self)
-            setPressed(key, true)
-            beginTouch(ts)
+    public override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        // 同時に触れた指は、触れた時刻の順に処理する
+        for touch in touches.sorted(by: { $0.timestamp < $1.timestamp }) {
+            processor.touchBegan(id: touchID(touch), at: touch.location(in: self), time: touch.timestamp)
         }
+        updateTicker()
     }
 
     public override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
         for touch in touches {
-            guard let ts = touchStates[ObjectIdentifier(touch)], !ts.finished else { continue }
-            ts.current = touch.location(in: self)
-            moveTouch(ts)
+            processor.touchMoved(id: touchID(touch), to: touch.location(in: self), time: touch.timestamp)
         }
+        updateTicker()
     }
 
     public override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
-        for touch in touches {
-            let id = ObjectIdentifier(touch)
-            guard let ts = touchStates[id] else { continue }
-            ts.current = touch.location(in: self)
-            if !ts.finished {
-                if case .flick = ts.key.definition.kind {
-                    ts.direction = classifier.direction(dx: Double(ts.current.x - ts.start.x), dy: Double(ts.current.y - ts.start.y))
-                } else if case .modifier = ts.key.definition.kind {
-                    ts.direction = classifier.direction(dx: Double(ts.current.x - ts.start.x), dy: Double(ts.current.y - ts.start.y))
-                }
-                endTouch(ts)
-            }
-            cleanup(ts)
-            touchStates[id] = nil
+        for touch in touches.sorted(by: { $0.timestamp < $1.timestamp }) {
+            processor.touchEnded(id: touchID(touch), at: touch.location(in: self), time: touch.timestamp)
         }
+        updateTicker()
     }
 
     public override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
         for touch in touches {
-            let id = ObjectIdentifier(touch)
-            guard let ts = touchStates[id] else { continue }
-            cleanup(ts)
-            touchStates[id] = nil
+            processor.touchCancelled(id: touchID(touch))
         }
+        updateTicker()
     }
 
-    private func cancelAllTouches() {
-        for ts in touchStates.values {
-            cleanup(ts)
-        }
-        touchStates.removeAll()
-    }
-
-    private func beginTouch(_ ts: TouchState) {
-        switch ts.key.definition.kind {
-        case .delete:
-            perform(.delete)
-            startRepeat(ts, delay: settings.deleteRepeatDelay, interval: 0.06, action: .delete)
-        case .cursorLeft:
-            perform(.cursorLeft)
-            startRepeat(ts, delay: 0.4, interval: 0.07, action: .cursorLeft)
-        case .cursorRight:
-            perform(.cursorRight)
-            startRepeat(ts, delay: 0.4, interval: 0.07, action: .cursorRight)
-        case .shift:
-            perform(.shift)
-        case .space:
-            // 長押しでもカーソル移動モードに入る
-            ts.holdTimer = scheduledTimer(after: 0.45) { [weak self, weak ts] in
-                guard let self, let ts, !ts.finished, !ts.isDraggingCursor else { return }
-                ts.isDraggingCursor = true
-                ts.dragAnchorX = ts.current.x
-                self.keyViews[ts.key.definition.id]?.configure(title: "◀︎ カーソル ▶︎", fontSize: 14, style: .functional)
-                self.renderedSignatures[ts.key.definition.id] = nil
-            }
-        case let .flick(spec):
-            if settings.showsFlickGuide {
-                ts.holdTimer = scheduledTimer(after: 0.35) { [weak self, weak ts] in
-                    guard let self, let ts, !ts.finished else { return }
-                    ts.showsAllGuide = true
-                    self.showGuide(ts, outputs: spec.outputs)
+    /// 長押し・連続動作の処理待ちがある間だけ、時計を動かす
+    private func updateTicker() {
+        if processor.needsTicks {
+            guard ticker == nil else { return }
+            let timer = Timer(timeInterval: 0.01, repeats: true) { [weak self] _ in
+                guard let self else { return }
+                self.processor.tick(time: ProcessInfo.processInfo.systemUptime)
+                if !self.processor.needsTicks {
+                    self.ticker?.invalidate()
+                    self.ticker = nil
                 }
             }
-        case .character(let text):
-            let shown = state.shift != .off ? text.uppercased() : text
-            previewView.show(text: shown, above: ts.key.frame, fontSize: CGFloat(settings.kanaFontSize))
-        default:
-            break
+            RunLoop.main.add(timer, forMode: .common)
+            ticker = timer
+        } else {
+            ticker?.invalidate()
+            ticker = nil
         }
     }
 
-    private func moveTouch(_ ts: TouchState) {
-        let dx = Double(ts.current.x - ts.start.x)
-        let dy = Double(ts.current.y - ts.start.y)
-        switch ts.key.definition.kind {
-        case let .flick(spec):
-            let direction = classifier.direction(dx: dx, dy: dy)
-            if direction != ts.direction {
-                ts.direction = direction
-                if settings.showsFlickGuide || ts.showsAllGuide {
-                    showGuide(ts, outputs: spec.outputs)
+    /// 押下表示・フリック先の吹き出し・英字の拡大表示・カーソル移動中の表示を反映する
+    private func applyVisual(_ visual: KeyTouchProcessor.VisualState) {
+        for (id, view) in keyViews {
+            let pressed = visual.pressedKeyIDs.contains(id)
+            if view.isPressed != pressed {
+                view.isPressed = pressed
+            }
+        }
+        if let guide = visual.guide {
+            guideView.show(outputs: guide.outputs, keyFrame: guide.keyFrame, active: guide.active, showsAll: guide.showsAll, fontSize: CGFloat(settings.kanaFontSize))
+        } else {
+            guideView.hide()
+        }
+        if let preview = visual.preview {
+            previewView.show(text: preview.text, above: preview.keyFrame, fontSize: CGFloat(settings.kanaFontSize))
+        } else {
+            previewView.hide()
+        }
+        let dragging = visual.cursorDragKeyID != nil
+        if dragging != showsCursorDragLabel {
+            showsCursorDragLabel = dragging
+            if let id = visual.cursorDragKeyID ?? spec.keys.first(where: { $0.kind == .space })?.id {
+                renderedSignatures[id] = nil
+                if dragging {
+                    keyViews[id]?.configure(title: "◀︎ カーソル ▶︎", fontSize: 14, style: .functional)
+                } else {
+                    refreshDynamicKeys()
                 }
             }
-        case .modifier:
-            ts.direction = classifier.direction(dx: dx, dy: dy)
-        case .space:
-            let step = CGFloat(settings.cursorDragStep)
-            if !ts.isDraggingCursor, abs(dx) > 12 {
-                ts.isDraggingCursor = true
-                ts.holdTimer?.invalidate()
-                ts.dragAnchorX = ts.current.x
-                keyViews[ts.key.definition.id]?.configure(title: "◀︎ カーソル ▶︎", fontSize: 14, style: .functional)
-                renderedSignatures[ts.key.definition.id] = nil
-            }
-            if ts.isDraggingCursor {
-                let steps = Int((ts.current.x - ts.dragAnchorX) / step)
-                if steps != 0 {
-                    ts.dragAnchorX += CGFloat(steps) * step
-                    perform(.moveCursor(steps))
-                }
-            }
-        case .character:
-            // 指をずらした先のキーで入力する
-            if let key = geometry?.key(at: ts.current), key.definition.id != ts.key.definition.id, case .character(let text) = key.definition.kind {
-                setPressed(ts.key, false)
-                ts.key = key
-                setPressed(key, true)
-                let shown = state.shift != .off ? text.uppercased() : text
-                previewView.show(text: shown, above: key.frame, fontSize: CGFloat(settings.kanaFontSize))
-            }
-        case .delete:
-            break
-        default:
-            break
-        }
-    }
-
-    private func endTouch(_ ts: TouchState) {
-        ts.finished = true
-        switch ts.key.definition.kind {
-        case let .flick(spec):
-            perform(.flick(keyID: ts.key.definition.id, spec: spec, direction: ts.direction))
-        case .modifier:
-            perform(.modifier(ts.direction))
-        case let .character(text):
-            perform(.character(text))
-        case .space:
-            if !ts.isDraggingCursor {
-                perform(.space)
-            }
-        case .enter:
-            if !state.enterKeyDisabled {
-                perform(.enter)
-            }
-        case let .switchMode(mode):
-            perform(.switchMode(mode))
-        case .caseToggle:
-            perform(.toggleCase)
-        case .delete, .cursorLeft, .cursorRight, .shift, .nextKeyboard:
-            break
-        }
-    }
-
-    /// ロールオーバー時に、まだ指が離れていない文字キーの入力をその時点の方向で確定する
-    private func finishPendingCharacterTouches() {
-        for ts in touchStates.values where !ts.finished {
-            switch ts.key.definition.kind {
-            case .flick, .modifier, .character:
-                endTouch(ts)
-                cleanup(ts)
-            default:
-                break
-            }
-        }
-    }
-
-    private func cleanup(_ ts: TouchState) {
-        ts.finished = true
-        ts.invalidateTimers()
-        setPressed(ts.key, false)
-        guideView.hide()
-        previewView.hide()
-        if case .space = ts.key.definition.kind, ts.isDraggingCursor {
-            refreshDynamicKeys()
         }
     }
 
     private func perform(_ action: KeyAction) {
         delegate?.keyboardView(self, perform: action)
-    }
-
-    private func setPressed(_ key: LaidOutKey, _ pressed: Bool) {
-        keyViews[key.definition.id]?.isPressed = pressed
-    }
-
-    private func showGuide(_ ts: TouchState, outputs: [FlickDirection: String]) {
-        guideView.show(outputs: outputs, keyFrame: ts.key.frame, active: ts.direction, showsAll: ts.showsAllGuide, fontSize: CGFloat(settings.kanaFontSize))
-    }
-
-    private func startRepeat(_ ts: TouchState, delay: Double, interval: Double, action: KeyAction) {
-        ts.holdTimer = scheduledTimer(after: delay) { [weak self, weak ts] in
-            guard let self, let ts, !ts.finished else { return }
-            let timer = Timer(timeInterval: interval, repeats: true) { [weak self, weak ts] timer in
-                guard let self, let ts, !ts.finished else {
-                    timer.invalidate()
-                    return
-                }
-                self.perform(action)
-            }
-            RunLoop.main.add(timer, forMode: .common)
-            ts.repeatTimer = timer
-            self.perform(action)
-        }
-    }
-
-    private func scheduledTimer(after delay: Double, _ block: @escaping () -> Void) -> Timer {
-        let timer = Timer(timeInterval: delay, repeats: false) { _ in block() }
-        RunLoop.main.add(timer, forMode: .common)
-        return timer
     }
 }
 #endif
