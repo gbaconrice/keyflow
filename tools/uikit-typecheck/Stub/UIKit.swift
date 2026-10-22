@@ -120,6 +120,7 @@ open class UIView: UIResponder {
     open var topAnchor: NSLayoutYAxisAnchor { NSLayoutYAxisAnchor() }
     open var bottomAnchor: NSLayoutYAxisAnchor { NSLayoutYAxisAnchor() }
     open func addSubview(_ v: UIView) {}
+    open func addGestureRecognizer(_ g: UIGestureRecognizer) {}
     open func insertSubview(_ v: UIView, at: Int) {}
     open func removeFromSuperview() {}
     open func layoutSubviews() {}
@@ -132,7 +133,15 @@ open class UIView: UIResponder {
     public static let layoutFittingCompressedSize = CGSize.zero
 }
 open class UIWindow: UIView {}
-open class UIGestureRecognizer: NSObject { open var delaysTouchesBegan = true }
+public enum UIGestureRecognizerState { case possible, began, changed, ended, cancelled, failed }
+open class UIGestureRecognizer: NSObject {
+    public typealias State = UIGestureRecognizerState
+    public init(target: Any?, action: Selector?) {}
+    open var delaysTouchesBegan = true
+    open var state: UIGestureRecognizerState { .possible }
+    open var view: UIView? { nil }
+}
+open class UILongPressGestureRecognizer: UIGestureRecognizer { open var minimumPressDuration: TimeInterval = 0.5 }
 public enum NSTextAlignment { case left, center, right, natural }
 public enum NSLineBreakMode { case byTruncatingTail, byWordWrapping }
 public enum UIBaselineAdjustment { case alignCenters, none }

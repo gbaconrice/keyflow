@@ -194,6 +194,17 @@ public final class AzooKeyEngine: ConversionEngine {
         converter.importDynamicUserDictionary(elements)
     }
 
+    public func forget(_ candidate: ConversionCandidate, of list: CandidateList) {
+        guard candidate.kind == .conversion, let last = lastResult, last.requestID == list.requestID,
+              last.candidates.indices.contains(candidate.engineIndex) else {
+            return
+        }
+        converter.forgetMemory(last.candidates[candidate.engineIndex])
+        converter.commitUpdateLearningData()
+        // 同じ読みの変換結果が使い回されないよう、変換の途中状態を捨てる
+        converter.stopComposition()
+    }
+
     /// 読み込んだ辞書を手放してメモリを空ける（学習データは保存してから）
     public func purgeMemory() {
         guard let loadedConverter else { return }

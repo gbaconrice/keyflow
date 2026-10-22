@@ -133,6 +133,12 @@ public final class ConversionQueue {
         }
     }
 
+    public func forget(_ candidate: ConversionCandidate, of list: CandidateList) {
+        scheduler.runInBackground { [engine] in
+            engine.forget(candidate, of: list)
+        }
+    }
+
     public func resetComposition() {
         cancel()
         scheduler.runInBackground { [engine] in

@@ -464,6 +464,25 @@ public final class InputController {
         commit(candidate: candidate, continueComposing: false)
     }
 
+    /// 候補の学習を取り消す（間違って覚えた候補を上位に出さないようにする）
+    public func forgetCandidate(at index: Int, requestID: Int) {
+        guard requestID == candidateList.requestID, candidateList.candidates.indices.contains(index) else {
+            return
+        }
+        let candidate = candidateList.candidates[index]
+        guard candidate.kind == .conversion else { return }
+        conversion.forget(candidate, of: candidateList)
+        // 並び順を更新するため、変換し直す
+        if !composition.isEmpty, selectedIndex == nil {
+            let source = composition.textBeforeCursor
+            if !source.isEmpty {
+                conversion.request(source: source, options: conversionOptions)
+            }
+        } else if let reconversion {
+            conversion.request(source: reconversion.reading, options: conversionOptions)
+        }
+    }
+
     /// 直前に確定した文字列を読みに戻す（変換し直すため）
     public func undoLastCommit() {
         beginKeyAction()

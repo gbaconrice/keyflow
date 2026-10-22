@@ -215,6 +215,10 @@ public final class KeyboardSession: NSObject, KeyboardViewDelegate, CandidateBar
         controller.selectCandidate(at: index, requestID: requestID)
     }
 
+    public func candidateBar(_ bar: CandidateBarView, didForget index: Int, requestID: Int) {
+        controller.forgetCandidate(at: index, requestID: requestID)
+    }
+
     public func candidateBarDidTapUndo(_ bar: CandidateBarView) {
         controller.undoLastCommit()
     }

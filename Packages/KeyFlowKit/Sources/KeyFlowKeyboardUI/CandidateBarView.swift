@@ -9,6 +9,8 @@ public protocol CandidateBarDelegate: AnyObject {
     func candidateBarDidTapSettings(_ bar: CandidateBarView)
     func candidateBarDidTapDismiss(_ bar: CandidateBarView)
     func candidateBarDidTapSymbols(_ bar: CandidateBarView)
+    /// 候補を長押しして、学習の取り消しを確定した
+    func candidateBar(_ bar: CandidateBarView, didForget index: Int, requestID: Int)
 }
 
 /// 候補1つ分のボタン
@@ -66,6 +68,12 @@ public final class CandidateBarView: UIView {
     private let separator = UIView()
     /// 選択中のテキストを変換し直していることを示すラベル
     private let reconversionLabel = UILabel()
+    /// 長押しした候補の学習を取り消すかの確認
+    private let forgetPrompt = UIView()
+    private let forgetLabel = UILabel()
+    private let forgetButton = UIButton(type: .system)
+    private let forgetCancelButton = UIButton(type: .system)
+    private var forgetTarget: (index: Int, requestID: Int)?
     public var fontSize: CGFloat = 17 {
         didSet { if oldValue != fontSize { setNeedsLayout() } }
     }
@@ -104,6 +112,23 @@ public final class CandidateBarView: UIView {
         separator.backgroundColor = KeyboardTheme.separator
         addSubview(separator)
 
+        forgetPrompt.backgroundColor = KeyboardTheme.candidateBar
+        forgetPrompt.isHidden = true
+        forgetLabel.font = .systemFont(ofSize: 14)
+        forgetLabel.textColor = KeyboardTheme.label
+        forgetLabel.adjustsFontSizeToFitWidth = true
+        forgetLabel.minimumScaleFactor = 0.7
+        forgetButton.setTitle("取り消す", for: .normal)
+        forgetButton.titleLabel?.font = .systemFont(ofSize: 15, weight: .semibold)
+        forgetButton.addTarget(self, action: #selector(confirmForget), for: .touchUpInside)
+        forgetCancelButton.setTitle("やめる", for: .normal)
+        forgetCancelButton.titleLabel?.font = .systemFont(ofSize: 15)
+        forgetCancelButton.addTarget(self, action: #selector(cancelForget), for: .touchUpInside)
+        forgetPrompt.addSubview(forgetLabel)
+        forgetPrompt.addSubview(forgetButton)
+        forgetPrompt.addSubview(forgetCancelButton)
+        addSubview(forgetPrompt)
+
         reconversionLabel.text = "再変換"
         reconversionLabel.font = .systemFont(ofSize: 12, weight: .medium)
         reconversionLabel.textColor = KeyboardTheme.secondaryLabel
@@ -124,6 +149,7 @@ public final class CandidateBarView: UIView {
         undoButton.isHidden = !state.canUndoCommit
         reconversionLabel.isHidden = !state.isReconverting
         if changed {
+            hideForgetPrompt()
             reloadCells()
             scrollView.setContentOffset(.zero, animated: false)
         } else if selectionChanged {
@@ -136,6 +162,9 @@ public final class CandidateBarView: UIView {
         while cells.count < candidates.count {
             let cell = CandidateCell()
             cell.addTarget(self, action: #selector(tapCandidate(_:)), for: .touchUpInside)
+            let longPress = UILongPressGestureRecognizer(target: self, action: #selector(longPressCandidate(_:)))
+            longPress.minimumPressDuration = 0.5
+            cell.addGestureRecognizer(longPress)
             scrollView.addSubview(cell)
             cells.append(cell)
         }
@@ -207,6 +236,37 @@ public final class CandidateBarView: UIView {
             x += w + 2
         }
         scrollView.contentSize = CGSize(width: x, height: h)
+        forgetPrompt.frame = bounds
+        let buttonW: CGFloat = 76
+        forgetCancelButton.frame = CGRect(x: bounds.width - buttonW, y: 0, width: buttonW, height: h)
+        forgetButton.frame = CGRect(x: bounds.width - buttonW * 2, y: 0, width: buttonW, height: h)
+        forgetLabel.frame = CGRect(x: 12, y: 0, width: max(bounds.width - buttonW * 2 - 16, 0), height: h)
+    }
+
+    @objc private func longPressCandidate(_ recognizer: UILongPressGestureRecognizer) {
+        guard recognizer.state == .began, let cell = recognizer.view as? CandidateCell,
+              candidates.indices.contains(cell.index), candidates[cell.index].kind == .conversion else {
+            return
+        }
+        forgetTarget = (cell.index, requestID)
+        forgetLabel.text = "「\(candidates[cell.index].text)」の学習を取り消しますか？"
+        forgetPrompt.isHidden = false
+    }
+
+    @objc private func confirmForget() {
+        if let target = forgetTarget {
+            delegate?.candidateBar(self, didForget: target.index, requestID: target.requestID)
+        }
+        hideForgetPrompt()
+    }
+
+    @objc private func cancelForget() {
+        hideForgetPrompt()
+    }
+
+    private func hideForgetPrompt() {
+        forgetTarget = nil
+        forgetPrompt.isHidden = true
     }
 
     @objc private func tapCandidate(_ sender: CandidateCell) {

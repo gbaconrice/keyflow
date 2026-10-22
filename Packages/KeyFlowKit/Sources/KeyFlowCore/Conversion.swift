@@ -140,10 +140,13 @@ public protocol ConversionEngine: AnyObject {
     func updateUserDictionary(_ entries: [UserDictionaryEntry])
     /// メモリが足りないときに、作り直せるキャッシュを捨てる
     func purgeMemory()
+    /// 候補の学習を取り消す
+    func forget(_ candidate: ConversionCandidate, of list: CandidateList)
 }
 
 extension ConversionEngine {
     public func purgeMemory() {}
+    public func forget(_ candidate: ConversionCandidate, of list: CandidateList) {}
 }
 
 /// ユーザー辞書の1語

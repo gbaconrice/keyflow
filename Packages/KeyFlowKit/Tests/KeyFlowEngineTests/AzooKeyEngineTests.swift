@@ -54,6 +54,25 @@ struct AzooKeyEngineTests {
         #expect(third.candidates.first?.text == first.candidates.first?.text)
     }
 
+    @Test("学習を取り消すと元の順位に戻る")
+    func forget() {
+        let engine = AzooKeyEngine(memoryDirectory: makeTempDirectory())
+        let options = ConversionOptions(predictionEnabled: false)
+        let first = engine.candidates(for: "せいかく", requestID: 1, options: options)
+        guard let original = first.candidates.first, let target = first.candidates.dropFirst().first(where: { $0.consumedCount == 4 }) else {
+            Issue.record("候補が足りない")
+            return
+        }
+        engine.commit(target, of: first, remaining: "", options: options)
+        engine.flushLearning()
+        let learned = engine.candidates(for: "せいかく", requestID: 2, options: options)
+        #expect(learned.candidates.first?.text == target.text)
+        guard let index = learned.candidates.firstIndex(where: { $0.text == target.text }) else { return }
+        engine.forget(learned.candidates[index], of: learned)
+        let after = engine.candidates(for: "せいかく", requestID: 3, options: options)
+        #expect(after.candidates.first?.text == original.text)
+    }
+
     @Test("ユーザー辞書の語が候補に出る")
     func userDictionary() {
         let engine = AzooKeyEngine(memoryDirectory: makeTempDirectory())
