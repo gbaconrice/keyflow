@@ -31,7 +31,8 @@ public final class AzooKeyEngine: ConversionEngine {
     private var lastNextWord: (requestID: Int, base: Candidate, predictions: [PostCompositionPredictionCandidate])?
     /// 最後に確定した候補（次の語の予測の起点）
     private var lastCommitted: Candidate?
-    private let textReplacer = TextReplacer.withDefaultEmojiDictionary()
+    /// 絵文字の候補に使う表（約4MB）。絵文字を候補に出す設定のときだけ読み込む
+    private lazy var emojiReplacer = TextReplacer.withDefaultEmojiDictionary()
 
     /// - Parameters:
     ///   - memoryDirectory: 学習データを書き込むディレクトリ（キーボード拡張自身のコンテナ）
@@ -57,7 +58,7 @@ public final class AzooKeyEngine: ConversionEngine {
             shouldResetMemory: false,
             memoryDirectoryURL: memoryDirectory,
             sharedContainerURL: sharedDirectory,
-            textReplacer: textReplacer,
+            textReplacer: o.emojiCandidates ? emojiReplacer : .empty,
             specialCandidateProviders: KanaKanjiConverter.defaultSpecialCandidateProviders,
             zenzaiMode: .off,
             metadata: .init(versionString: versionString)

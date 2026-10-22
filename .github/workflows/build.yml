@@ -124,7 +124,8 @@ jobs:
           set -o pipefail
           DEST="$(scripts/pick-simulator.sh)"
           echo "SIM_UDID=${DEST##*id=}" >> "$GITHUB_ENV"
-          xcodebuild build-for-testing -project KeyFlow.xcodeproj -scheme KeyFlow -destination "$DEST" \
+          # 配布するIPAと同じReleaseでビルドする（Debugはメモリの使い方が大きく異なり、計測の意味が薄れるため）
+          xcodebuild build-for-testing -project KeyFlow.xcodeproj -scheme KeyFlow -configuration Release -destination "$DEST" \
             -derivedDataPath build-sim \
             CODE_SIGN_IDENTITY="-" CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM="" CODE_SIGNING_REQUIRED=NO \
             KEYFLOW_BUNDLE_ID="$BUNDLE_ID" KEYFLOW_APP_GROUP="$APP_GROUP" \
