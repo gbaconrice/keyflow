@@ -85,4 +85,36 @@ final class KeyboardExtensionUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 0.5)
         snap(app, "25-extension-back-to-kana")
     }
+
+    /// 入力中に入力欄をタップしても、文字が重複・消失しない（外部からの変更の検出）
+    func testTapWhileComposing() throws {
+        let app = XCUIApplication()
+        app.launch()
+        app.buttons["試し打ち"].firstMatch.tap()
+        let editor = app.textViews.firstMatch
+        XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        editor.tap()
+        guard key(app, "a").waitForExistence(timeout: 10) else {
+            XCTFail("キーボード拡張のキーが見つからない")
+            return
+        }
+        Thread.sleep(forTimeInterval: 2)
+        key(app, "a").tap()
+        key(app, "cursorRight").tap()
+        flick(key(app, "a"), dx: -40, dy: 0)
+        Thread.sleep(forTimeInterval: 0.5)
+        snap(app, "30-composing-before-tap")
+        // 入力欄の空いているところ（文末の後ろ）をタップする
+        editor.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.8)).tap()
+        Thread.sleep(forTimeInterval: 1)
+        flick(key(app, "a"), dx: 0, dy: -40)
+        Thread.sleep(forTimeInterval: 0.5)
+        snap(app, "31-typed-after-tap")
+        key(app, "enter").tap()
+        Thread.sleep(forTimeInterval: 0.5)
+        let text = (editor.value as? String) ?? ""
+        note("31-text", text)
+        snap(app, "32-after-enter")
+        XCTAssertEqual(text, "あいう", "入力中のタップで文字が重複・消失していないこと")
+    }
 }
