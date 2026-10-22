@@ -38,6 +38,27 @@ private enum SharedConversion {
     static var userDictionaryFingerprint: Int?
     /// iPhoneの「ユーザ辞書」から取り込んだ単語
     static var systemLexiconEntries: [UserDictionaryEntry] = []
+    /// iPhoneの「ユーザ辞書」の英字の短縮形（小文字の短縮形 → 置き換える文字列）
+    static var englishShortcuts: [String: String] = [:]
+    /// 英単語の補完（端末内の辞書を使う）
+    static let textChecker = UITextChecker()
+
+    /// 英字で打っている途中の単語の候補。短縮形を先に、続けて補完、補完が少なければつづりの候補を出す。
+    static func suggestions(for word: String) -> [String] {
+        var result: [String] = []
+        if let expanded = englishShortcuts[word.lowercased()] {
+            result.append(expanded)
+        }
+        let range = NSRange(location: 0, length: word.utf16.count)
+        let language = "en_US"
+        result += (textChecker.completions(forPartialWordRange: range, in: word, language: language) ?? []).prefix(6)
+        // 補完が少なく、つづりが辞書にないときは、つづりの候補も出す
+        if result.count < 3, word.count >= 3,
+           textChecker.rangeOfMisspelledWord(in: word, range: range, startingAt: 0, wrap: false, language: language).location != NSNotFound {
+            result += (textChecker.guesses(forWordRange: range, in: word, language: language) ?? []).prefix(3)
+        }
+        return result
+    }
 
     /// 共有のエンジン。初めて作ったときは`isNew`がtrue。
     static func engine(store: SettingsStore, versionString: String) -> (engine: AzooKeyEngine, isNew: Bool) {
@@ -82,6 +103,7 @@ final class KeyboardViewController: UIInputViewController {
         let controller = InputController(settings: settings, conversion: conversion)
         controller.document = ProxyTextDocument(inputViewController: self)
         controller.readingProvider = { JapaneseReading.reading(of: $0) }
+        controller.wordSuggester = { SharedConversion.suggestions(for: $0) }
         let session = KeyboardSession(controller: controller, settings: settings)
         session.onSettingsChange = { [weak self] s in
             self?.store?.saveLocalSettings(s)
@@ -252,13 +274,16 @@ final class KeyboardViewController: UIInputViewController {
     private func loadSystemLexicon() {
         guard store?.loadEffectiveSettings().systemLexiconEnabled ?? true else {
             SharedConversion.systemLexiconEntries = []
+            SharedConversion.englishShortcuts = [:]
             return
         }
         requestSupplementaryLexicon { [weak self] lexicon in
             let pairs = lexicon.entries.map { (input: $0.userInput, text: $0.documentText) }
             let entries = SystemLexicon.userDictionaryEntries(from: pairs)
+            let shortcuts = SystemLexicon.englishShortcuts(from: pairs)
             DispatchQueue.main.async {
                 SharedConversion.systemLexiconEntries = entries
+                SharedConversion.englishShortcuts = shortcuts
                 self?.reloadUserDictionaryIfNeeded()
             }
         }

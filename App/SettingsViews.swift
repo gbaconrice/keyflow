@@ -155,6 +155,7 @@ struct InputSettingsView: View {
                     Text("12キー（フリック）").tag(EnglishLayout.flick)
                 }
                 Toggle("英字の文頭を大文字にする", isOn: $model.settings.englishAutoCapitalization)
+                Toggle("英字で単語の候補を出す", isOn: $model.settings.englishSuggestionsEnabled)
             }
             Section {
                 Toggle("入力中の文字に下線を付ける", isOn: $model.settings.usesMarkedText)

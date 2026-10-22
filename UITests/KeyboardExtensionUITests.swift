@@ -86,6 +86,21 @@ final class KeyboardExtensionUITests: XCTestCase {
         key(app, "toEnglish").tap()
         Thread.sleep(forTimeInterval: 0.5)
         snap(app, "24-extension-english")
+        // 英単語の候補（端末内の辞書による補完）
+        for c in "hel" {
+            key(app, "en_\(c)").tap()
+        }
+        Thread.sleep(forTimeInterval: 0.5)
+        snap(app, "24b-english-suggestions")
+        let hello = app.staticTexts["hello"].firstMatch
+        if hello.waitForExistence(timeout: 2) {
+            hello.tap()
+            Thread.sleep(forTimeInterval: 0.5)
+            note("24b-text", (editor.value as? String) ?? "(nil)")
+            XCTAssertEqual((editor.value as? String) ?? "", "今日はいい天気hello ")
+        } else {
+            note("24b-text", "候補に hello が見つからない: " + ((editor.value as? String) ?? "(nil)"))
+        }
         key(app, "toKana").tap()
         Thread.sleep(forTimeInterval: 0.5)
         snap(app, "25-extension-back-to-kana")

@@ -26,4 +26,16 @@ struct SystemLexiconTests {
         let pairs = (0..<3000).map { (input: "あ", text: "単語\($0)") }
         #expect(SystemLexicon.userDictionaryEntries(from: pairs).count == SystemLexicon.maximumCount)
     }
+
+    @Test("英字の短縮形はキーを小文字にして取り出す")
+    func englishShortcuts() {
+        let shortcuts = SystemLexicon.englishShortcuts(from: [
+            ("omw", "On my way!"),
+            ("BTW", "by the way"),
+            ("よろ", "よろしく"),
+            ("ok", "OK"),
+            ("e-mail", "メール"),
+        ])
+        #expect(shortcuts == ["omw": "On my way!", "btw": "by the way"])
+    }
 }

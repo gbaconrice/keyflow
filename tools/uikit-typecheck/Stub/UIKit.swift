@@ -308,6 +308,12 @@ open class UILexiconEntry: NSObject {
     open var userInput: String { "" }
     open var documentText: String { "" }
 }
+open class UITextChecker: NSObject {
+    public override init() {}
+    open func rangeOfMisspelledWord(in string: String, range: NSRange, startingAt startingOffset: Int, wrap wrapFlag: Bool, language: String) -> NSRange { NSRange(location: NSNotFound, length: 0) }
+    open func guesses(forWordRange range: NSRange, in string: String, language: String) -> [String]? { nil }
+    open func completions(forPartialWordRange range: NSRange, in string: String, language: String) -> [String]? { nil }
+}
 open class UILexicon: NSObject {
     open var entries: [UILexiconEntry] { [] }
 }

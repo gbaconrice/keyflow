@@ -134,6 +134,9 @@ public final class AzooKeyEngine: ConversionEngine {
                 converter.updateLearningData(next.base, with: prediction)
             }
             lastCommitted = prediction.isTerminal ? nil : prediction.join(to: next.base)
+        case .word:
+            // 英単語の候補は変換エンジンを通さないので、学習するものはない
+            break
         }
     }
 

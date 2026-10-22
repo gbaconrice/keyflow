@@ -29,4 +29,21 @@ public enum SystemLexicon {
         }
         return result
     }
+
+    /// 英字の短縮形（"omw" → "On my way!"など）。キーは小文字にそろえる。英字で打っているときの候補に使う。
+    public static func englishShortcuts(from pairs: [(input: String, text: String)]) -> [String: String] {
+        var result: [String: String] = [:]
+        for (input, text) in pairs {
+            let key = input.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard !key.isEmpty, key.count <= 40, !text.isEmpty, text.count <= 500, text.lowercased() != key,
+                  key.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber) }), result[key] == nil else {
+                continue
+            }
+            result[key] = text
+            if result.count >= maximumCount {
+                break
+            }
+        }
+        return result
+    }
 }

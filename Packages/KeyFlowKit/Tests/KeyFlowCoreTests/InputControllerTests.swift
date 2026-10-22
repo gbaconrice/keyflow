@@ -471,3 +471,74 @@ struct InputControllerTests {
         #expect(h.field.markedText == nil)
     }
 }
+
+@Suite("英字の単語の候補")
+struct EnglishSuggestionTests {
+    private func harness(text: String = "") -> Harness {
+        let h = Harness(text: text)
+        h.controller.wordSuggester = { word in
+            if word.lowercased() == "omw" {
+                return ["On my way!"]
+            }
+            return ["hello", "help", "helmet"].filter { $0.hasPrefix(word.lowercased()) }
+        }
+        h.controller.switchMode(to: .english)
+        return h
+    }
+
+    @Test("打っている単語の候補が出て、タップで置き換わり空白が付く")
+    func suggestAndReplace() {
+        let h = harness(text: "I said ")
+        for c in "hel" { h.controller.character(String(c)) }
+        #expect(h.candidates == ["hello", "help", "helmet"])
+        h.controller.selectCandidate(at: 1, requestID: h.controller.state.candidateRequestID)
+        #expect(h.field.text == "I said help ")
+        #expect(h.candidates.isEmpty)
+    }
+
+    @Test("大文字で始めた単語には、大文字で始まる候補を出す")
+    func matchesCase() {
+        let h = harness()
+        h.controller.toggleShift()
+        for c in "hel" { h.controller.character(String(c)) }
+        #expect(h.field.text == "Hel")
+        #expect(h.candidates.first == "Hello")
+        #expect(InputController.matchCase("hello", to: "HEL") == "HELLO")
+    }
+
+    @Test("短縮形も候補になり、削除すると候補が更新される")
+    func shortcutsAndDelete() {
+        let h = harness()
+        for c in "omw" { h.controller.character(String(c)) }
+        #expect(h.candidates == ["On my way!"])
+        h.controller.delete()
+        #expect(h.field.text == "om")
+        #expect(h.candidates.isEmpty)
+    }
+
+    @Test("URL欄・設定オフでは候補を出さない")
+    func disabled() {
+        let h = harness()
+        h.controller.configure(returnKey: .go, enablesReturnKeyAutomatically: false, fieldKind: .url)
+        for c in "hel" { h.controller.character(String(c)) }
+        #expect(h.candidates.isEmpty)
+
+        var settings = KeyboardSettings.default
+        settings.englishSuggestionsEnabled = false
+        let h2 = Harness(settings: settings)
+        h2.controller.wordSuggester = { _ in ["hello"] }
+        h2.controller.switchMode(to: .english)
+        for c in "hel" { h2.controller.character(String(c)) }
+        #expect(h2.candidates.isEmpty)
+    }
+
+    @Test("文末の後の空白で、次の文字が大文字になる表示に切り替わる")
+    func autoCapitalizationAfterSpace() {
+        var settings = KeyboardSettings.default
+        settings.englishAutoCapitalization = true
+        let h = Harness(settings: settings, text: "ok.")
+        h.controller.switchMode(to: .english)
+        h.controller.space()
+        #expect(h.controller.state.shift == .once)
+    }
+}

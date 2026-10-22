@@ -66,6 +66,8 @@ public struct ConversionCandidate: Sendable, Equatable {
         case conversion
         /// 確定後の次の語の予測
         case nextWord
+        /// 英字で打っている単語を置き換える候補（`consumedCount`は置き換える文字数）
+        case word
     }
 
     public var text: String

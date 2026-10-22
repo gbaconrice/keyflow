@@ -108,6 +108,9 @@ public final class InputController {
 
     /// 漢字を含む文字列の読み（ひらがな）を推定する。iOSではシステムの形態素解析を使う。
     public var readingProvider: ((String) -> String?)?
+    /// 英字で打っている途中の単語から、候補の単語を返す。iOSでは`UITextChecker`とユーザ辞書の短縮形を使う。
+    public var wordSuggester: ((String) -> [String])?
+    private var fieldKind: InputFieldKind = .normal
 
     private struct ToggleState {
         var keyID: String
@@ -133,6 +136,7 @@ public final class InputController {
     public func configure(returnKey: ReturnKeyKind, enablesReturnKeyAutomatically: Bool, fieldKind: InputFieldKind) {
         self.returnKey = returnKey
         self.enablesReturnKeyAutomatically = enablesReturnKeyAutomatically
+        self.fieldKind = fieldKind
         switch fieldKind {
         case .url, .email, .ascii:
             setMode(.english, commitComposition: true)
@@ -201,6 +205,7 @@ public final class InputController {
             document.deleteBackward()
             document.insertText(wasUpper ? current.current.uppercased() : current.current)
             recordExpectedContext()
+            updateWordSuggestions()
             rebuildState()
             return
         }
@@ -216,6 +221,7 @@ public final class InputController {
             toggle = ToggleState(keyID: keyID, cycle: spec.toggleCycle, index: spec.toggleCycle.firstIndex(of: output) ?? 0, time: t)
         }
         updateAutoShift()
+        updateWordSuggestions()
         rebuildState()
     }
 
@@ -260,6 +266,8 @@ public final class InputController {
         }
         insertDirect(output)
         updateAutoShift()
+        updateWordSuggestions()
+        rebuildState()
     }
 
     /// ローマ字入力の文字キー。小文字の英字はローマ字として読み、それ以外（シフト中の大文字・「ー」）はそのまま入れる。
@@ -330,6 +338,70 @@ public final class InputController {
         return String(before.dropLast(run.count)) + kana
     }
 
+    // MARK: - 英字の単語の候補
+
+    /// カーソル直前の英単語（打っている途中の単語）
+    private func currentEnglishWord() -> String {
+        guard let before = document?.documentContextBeforeInput else { return "" }
+        return String(before.reversed().prefix { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "'") }.reversed())
+    }
+
+    /// 英字で打っている単語の候補を出す（状態の通知は呼び出し側で行う）
+    private func updateWordSuggestions() {
+        guard mode == .english, settings.englishSuggestionsEnabled, composition.isEmpty, reconversion == nil,
+              fieldKind == .normal || fieldKind == .ascii, let wordSuggester else {
+            return
+        }
+        let word = currentEnglishWord()
+        guard !word.isEmpty, word.count <= 40, word.contains(where: { $0.isLetter }) else { return }
+        var seen: Set<String> = [word]
+        var suggestions: [String] = []
+        for raw in wordSuggester(word) {
+            let text = Self.matchCase(raw, to: word)
+            if seen.insert(text).inserted {
+                suggestions.append(text)
+            }
+            if suggestions.count >= 8 {
+                break
+            }
+        }
+        guard !suggestions.isEmpty else { return }
+        // 届く予定の変換結果（次の語の予測など）で上書きされないよう、要求を取り消してから表示する
+        conversion.cancel()
+        candidateList = CandidateList(
+            requestID: conversion.latestRequestID,
+            source: word,
+            candidates: suggestions.enumerated().map {
+                ConversionCandidate(text: $1, consumedCount: word.count, kind: .word, engineIndex: $0)
+            }
+        )
+    }
+
+    /// 打った単語の大文字・小文字に合わせる（"Hel" → "Hello"、"HEL" → "HELLO"）
+    static func matchCase(_ suggestion: String, to word: String) -> String {
+        guard let first = word.first, first.isUppercase else { return suggestion }
+        if word.count > 1, word.allSatisfy({ !$0.isLetter || $0.isUppercase }) {
+            return suggestion.uppercased()
+        }
+        guard let head = suggestion.first, head.isLowercase else { return suggestion }
+        return head.uppercased() + suggestion.dropFirst()
+    }
+
+    /// 打っている途中の単語を候補で置き換え、空白を付ける
+    private func replaceCurrentWord(with text: String, expected: String) {
+        guard composition.isEmpty, let document, currentEnglishWord() == expected else {
+            return
+        }
+        for _ in 0..<expected.count {
+            document.deleteBackward()
+        }
+        document.insertText(text + " ")
+        recordExpectedContext()
+        candidateList = .empty
+        updateAutoShift()
+        rebuildState()
+    }
+
     /// 「小゛゜」キー。centerは巡回、左は濁点、上は小文字、右は半濁点。
     public func modifier(direction: FlickDirection) {
         beginKeyAction()
@@ -389,6 +461,7 @@ public final class InputController {
         document?.deleteBackward()
         recordExpectedContext()
         updateAutoShift()
+        updateWordSuggestions()
         rebuildState()
     }
 
@@ -399,6 +472,7 @@ public final class InputController {
             let s = (mode == .english || settings.spaceWidth == .half) ? " " : "　"
             insertDirect(s)
             updateAutoShift()
+            rebuildState()
             return
         }
         if flushRomaji() {
@@ -523,6 +597,10 @@ public final class InputController {
         }
         toggle = nil
         let candidate = candidateList.candidates[index]
+        if candidate.kind == .word {
+            replaceCurrentWord(with: candidate.text, expected: candidateList.source)
+            return
+        }
         if candidate.kind == .nextWord {
             guard composition.isEmpty, let document else { return }
             document.insertText(candidate.text)
