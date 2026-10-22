@@ -160,6 +160,21 @@ struct RomajiInputTests {
         #expect(h.field.markedText == "かかん")
     }
 
+    @Test("QWERTYの数字配列の文字も入力中の文字列に入り、続けて変換できる")
+    func qwertyNumbers() {
+        let h = harness()
+        #expect(KeyboardLayouts.layout(for: .number, showsGlobeKey: false, kanaLayout: .romaji).isRowBased)
+        type(h, "n")
+        h.controller.switchMode(to: .number)
+        h.controller.character("3")
+        #expect(h.field.markedText == "ん3")
+        h.controller.switchMode(to: .kana)
+        type(h, "ji")
+        #expect(h.field.markedText == "ん3じ")
+        h.controller.enter()
+        #expect(h.field.text == "ん3じ")
+    }
+
     @Test("marked textを使わない設定でも同じ結果になる")
     func plainText() {
         var settings = KeyboardSettings.default

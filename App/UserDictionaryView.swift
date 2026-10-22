@@ -57,6 +57,11 @@ struct UserDictionaryView: View {
                     Text("\(model.userDictionary.count)語。次にキーボードを開いたときに反映されます。")
                 }
             }
+            Section {
+                Toggle("iPhoneのユーザ辞書も使う", isOn: $model.settings.systemLexiconEnabled)
+            } footer: {
+                Text("「設定」→「一般」→「キーボード」→「ユーザ辞書」に登録した単語も変換候補に出します。読みがひらがなかカタカナのものだけが対象です。フルアクセスは不要です。")
+            }
         }
         .navigationTitle("ユーザー辞書")
         .navigationBarTitleDisplayMode(.inline)

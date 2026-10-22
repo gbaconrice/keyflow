@@ -255,4 +255,38 @@ struct ConversionHeuristicsTests {
             #expect(list.candidates.first?.text == expected, "\(reading)")
         }
     }
+
+    @Test("文の終わりに来られない形で終わる候補は、同じ長さの自然な候補より下げる")
+    func awkwardEndingIsDemoted() {
+        // 776は体言接続特殊（文末に来られない形）、288は助詞、1285は名詞の品詞ID
+        let noun = (leftID: 1285, rightID: 1285)
+        let stem = (leftID: 776, rightID: 776)
+        let particle = (leftID: 288, rightID: 288)
+        #expect(ConversionHeuristics.isAwkward([noun, stem]))
+        #expect(ConversionHeuristics.isAwkward([stem, particle]))
+        #expect(!ConversionHeuristics.isAwkward([stem, noun]))
+        #expect(!ConversionHeuristics.isAwkward([noun, particle]))
+
+        struct C { var text: String; var score: Float; var length: Int; var awkward: Bool }
+        let list = [
+            C(text: "作", score: -12.5, length: 2, awkward: true),
+            C(text: "辛", score: -12.6, length: 1, awkward: false),
+            C(text: "つく", score: -13.3, length: 2, awkward: false),
+        ]
+        let reordered = ConversionHeuristics.reorder(list, text: \.text, score: \.score, length: \.length, isAwkward: \.awkward)
+        #expect(reordered.map(\.text) == ["つく", "作", "辛"])
+        // 点数差が大きければ変えない
+        let far = [C(text: "作", score: -10, length: 2, awkward: true), C(text: "つく", score: -13.3, length: 2, awkward: false)]
+        #expect(ConversionHeuristics.reorder(far, text: \.text, score: \.score, length: \.length, isAwkward: \.awkward).first?.text == "作")
+    }
+
+    @Test("実際の変換で「つく」が「作」にならない")
+    func awkwardEndingInRealConversion() {
+        let engine = AzooKeyEngine(memoryDirectory: makeTempDirectory())
+        for (i, reading) in ["つく", "4じごろつく"].enumerated() {
+            let list = engine.candidates(for: reading, requestID: i, options: .init(predictionEnabled: false))
+            let top = list.candidates.first?.text ?? ""
+            #expect(!top.hasSuffix("作"), "\(reading) → \(top)")
+        }
+    }
 }

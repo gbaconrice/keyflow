@@ -85,6 +85,7 @@ jobs:
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
             KEYFLOW_BUNDLE_ID="$BUNDLE_ID" KEYFLOW_APP_GROUP="$APP_GROUP" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
             2>&1 | tee build-device.log | grep -E "error:|warning: .*KeyFlow|BUILD (SUCCEEDED|FAILED)" || true
           grep -q "BUILD SUCCEEDED" build-device.log
       - name: Package IPA
@@ -99,9 +100,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          VERSION="$(date -u +%Y-%m-%d) ${GITHUB_SHA::7}"
+          VERSION="ビルド${GITHUB_RUN_NUMBER}・$(date -u +%Y-%m-%d) ${GITHUB_SHA::7}"
           cat > release-notes.md <<NOTES
           自動ビルド（${VERSION}）
+
+          アプリの画面下に表示される版の括弧内の数字が、ビルド番号（${GITHUB_RUN_NUMBER}）です。
 
           - \`KeyFlow.ipa\` をダウンロードし、Sideloadlyで署名してインストールします（[手順](https://github.com/${GITHUB_REPOSITORY}/blob/main/docs/INSTALL.md)）。
           - 無料のApple Accountでの署名は7日で期限が切れます。期限が切れたら、同じファイルでもう一度インストールしてください。

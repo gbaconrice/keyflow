@@ -294,6 +294,44 @@ public enum KeyboardLayouts {
         return KeyboardLayoutSpec(mode: .kana, columnWeights: Array(repeating: 1, count: 10), rowCount: 4, keys: keys, isRowBased: true)
     }
 
+    /// QWERTY型の数字・記号配列（ローマ字入力のとき）
+    ///
+    /// ```
+    /// [1][2][3][4][5][6][7][8][9][0]
+    /// [-][/][:][;][(][)][¥][&][@]["]
+    /// [「][」][、][。][？][！][ー][～] [⌫]
+    /// [あいう][ABC][     空白     ][改行]
+    /// ```
+    /// ほかの記号は候補バーの記号の一覧から入れる。
+    public static func numberQwerty(showsGlobeKey: Bool) -> KeyboardLayoutSpec {
+        var keys: [KeyDefinition] = []
+        let rows: [[String]] = [
+            ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+            ["-", "/", ":", ";", "(", ")", "¥", "&", "@", "\""],
+            ["「", "」", "、", "。", "？", "！", "ー", "～"],
+        ]
+        for (r, chars) in rows.enumerated() {
+            for (i, c) in chars.enumerated() {
+                keys.append(.init(id: "sym_\(r)_\(i)", kind: .character(c), placement: .init(column: Double(i), row: r)))
+            }
+        }
+        keys.append(.init(id: "delete", kind: .delete, placement: .init(column: 8, row: 2, width: 2), isFunctional: true))
+        var column: Double = 0
+        keys.append(.init(id: "toKana", kind: .switchMode(.kana), placement: .init(column: column, row: 3, width: 1.25), isFunctional: true))
+        column += 1.25
+        keys.append(.init(id: "toEnglish", kind: .switchMode(.english), placement: .init(column: column, row: 3, width: 1.25), isFunctional: true))
+        column += 1.25
+        if showsGlobeKey {
+            keys.append(.init(id: "globe", kind: .nextKeyboard, placement: .init(column: column, row: 3, width: 1), isFunctional: true))
+            column += 1
+        }
+        let spaceWidth = 10 - column - 2.0
+        keys.append(.init(id: "space", kind: .space, placement: .init(column: column, row: 3, width: spaceWidth)))
+        column += spaceWidth
+        keys.append(.init(id: "enter", kind: .enter, placement: .init(column: column, row: 3, width: 2.0), isFunctional: true))
+        return KeyboardLayoutSpec(mode: .number, columnWeights: Array(repeating: 1, count: 10), rowCount: 4, keys: keys, isRowBased: true)
+    }
+
     /// 12キー配列の左下2キー（モード切替と地球儀）
     private static func leftBottomKeys(current: KeyboardMode, showsGlobeKey: Bool) -> [KeyDefinition] {
         let other: KeyboardMode = current == .kana ? .number : .kana
@@ -362,7 +400,12 @@ public enum KeyboardLayouts {
             case .flick: return kana(showsGlobeKey: showsGlobeKey, sideColumnWeight: sideColumnWeight)
             case .romaji: return romaji(showsGlobeKey: showsGlobeKey)
             }
-        case .number: return number(showsGlobeKey: showsGlobeKey, sideColumnWeight: sideColumnWeight)
+        case .number:
+            // ローマ字入力の人には、QWERTYと同じ並べ方の数字・記号配列を出す
+            switch kanaLayout {
+            case .flick: return number(showsGlobeKey: showsGlobeKey, sideColumnWeight: sideColumnWeight)
+            case .romaji: return numberQwerty(showsGlobeKey: showsGlobeKey)
+            }
         case .english:
             switch englishLayout {
             case .qwerty: return english(showsGlobeKey: showsGlobeKey)

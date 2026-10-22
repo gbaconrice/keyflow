@@ -98,6 +98,8 @@ struct LayoutEngineTests {
         KeyboardLayouts.english(showsGlobeKey: true),
         KeyboardLayouts.romaji(showsGlobeKey: false),
         KeyboardLayouts.romaji(showsGlobeKey: true),
+        KeyboardLayouts.numberQwerty(showsGlobeKey: false),
+        KeyboardLayouts.numberQwerty(showsGlobeKey: true),
     ])
     func allLayoutsFit(spec: KeyboardLayoutSpec) {
         let g = LayoutEngine.layout(spec, context: .init(width: width, isLandscape: false, settings: .default))

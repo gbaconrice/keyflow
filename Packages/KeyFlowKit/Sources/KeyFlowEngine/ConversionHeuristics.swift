@@ -41,14 +41,47 @@ enum ConversionHeuristics {
         return changed ? String(result) : nil
     }
 
-    /// 候補（点数の高い順）を必要なら並べ替えたものを返す
-    static func reorder<T>(_ candidates: [T], text: (T) -> String, score: (T) -> Float) -> [T] {
-        guard let top = candidates.first, let preferred = preferredVariant(of: text(top)),
-              let index = candidates.firstIndex(where: { text($0) == preferred }), index > 0,
-              score(top) - score(candidates[index]) < maximumScoreGap else {
-            return candidates
+    /// 文として不自然な1位を、同じ長さの自然な候補と入れ替えるときの点数差の上限
+    static let maximumAwkwardScoreGap: Float = 2.0
+
+    /// 語の並び（品詞ID）が文として不自然か。
+    /// - 文の終わりに来られない活用形で終わる（「つく」→「作」、「かい」→「書い」）
+    /// - 名詞の前にしか来ない形の後に助詞が続く（「すぐ作よ」）
+    static func isAwkward(_ words: [(leftID: Int, rightID: Int)]) -> Bool {
+        guard let last = words.last else { return false }
+        if PartOfSpeech.nonTerminalRightIDs.contains(last.rightID) {
+            return true
         }
+        for (a, b) in zip(words, words.dropFirst())
+        where PartOfSpeech.attachesOnlyToNounIDs.contains(a.rightID) && PartOfSpeech.isParticle(leftID: b.leftID) {
+            return true
+        }
+        return false
+    }
+
+    /// 候補（点数の高い順）を必要なら並べ替えたものを返す
+    /// - Parameters:
+    ///   - length: 候補が使う読みの長さ（同じ長さの候補どうしでだけ入れ替える）
+    ///   - isAwkward: 文として不自然な候補か
+    static func reorder<T>(
+        _ candidates: [T],
+        text: (T) -> String,
+        score: (T) -> Float,
+        length: (T) -> Int = { _ in 0 },
+        isAwkward: (T) -> Bool = { _ in false }
+    ) -> [T] {
         var result = candidates
+        if let top = result.first, isAwkward(top),
+           let index = result.indices.dropFirst().first(where: { length(result[$0]) == length(top) && !isAwkward(result[$0]) }),
+           score(top) - score(result[index]) < maximumAwkwardScoreGap {
+            let moved = result.remove(at: index)
+            result.insert(moved, at: 0)
+        }
+        guard let top = result.first, let preferred = preferredVariant(of: text(top)),
+              let index = result.firstIndex(where: { text($0) == preferred }), index > 0,
+              score(top) - score(result[index]) < maximumScoreGap else {
+            return result
+        }
         let moved = result.remove(at: index)
         result.insert(moved, at: 0)
         return result

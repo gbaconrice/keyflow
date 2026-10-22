@@ -96,6 +96,8 @@ public struct KeyboardSettings: Codable, Sendable, Equatable {
     public var emojiCandidates: Bool = true
     /// テキストを選択したときに変換し直す候補を出す
     public var reconversionEnabled: Bool = true
+    /// iPhoneの「ユーザ辞書」に登録した単語も変換候補に出す
+    public var systemLexiconEnabled: Bool = true
 
     /// 設定を最後に変更した時刻（アプリとキーボード内で変更した値のどちらが新しいかの判定に使う）
     public var updatedAt: Date = .distantPast
@@ -157,7 +159,7 @@ public struct KeyboardSettings: Codable, Sendable, Equatable {
         case flickThreshold, toggleInputEnabled, toggleTimeout, showsFlickGuide, showsKeyHints, spaceWidth, usesMarkedText
         case kanaLayout, englishAutoCapitalization, englishLayout, deleteRepeatDelay, cursorDragStep
         case hapticFeedback, keySound
-        case learningEnabled, predictionEnabled, nextWordPredictionEnabled, emojiCandidates, reconversionEnabled
+        case learningEnabled, predictionEnabled, nextWordPredictionEnabled, emojiCandidates, reconversionEnabled, systemLexiconEnabled
         case updatedAt
     }
 
@@ -200,6 +202,7 @@ public struct KeyboardSettings: Codable, Sendable, Equatable {
         nextWordPredictionEnabled = v(.nextWordPredictionEnabled, d.nextWordPredictionEnabled)
         emojiCandidates = v(.emojiCandidates, d.emojiCandidates)
         reconversionEnabled = v(.reconversionEnabled, d.reconversionEnabled)
+        systemLexiconEnabled = v(.systemLexiconEnabled, d.systemLexiconEnabled)
         updatedAt = v(.updatedAt, d.updatedAt)
     }
 
@@ -238,6 +241,7 @@ public struct KeyboardSettings: Codable, Sendable, Equatable {
         try c.encode(nextWordPredictionEnabled, forKey: .nextWordPredictionEnabled)
         try c.encode(emojiCandidates, forKey: .emojiCandidates)
         try c.encode(reconversionEnabled, forKey: .reconversionEnabled)
+        try c.encode(systemLexiconEnabled, forKey: .systemLexiconEnabled)
         try c.encode(updatedAt, forKey: .updatedAt)
     }
 }

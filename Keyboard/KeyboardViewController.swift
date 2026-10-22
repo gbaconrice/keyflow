@@ -36,6 +36,8 @@ private enum SharedConversion {
     private static var engine: AzooKeyEngine?
     /// 最後に読み込んだユーザー辞書（同じ内容を読み込み直さないため）
     static var userDictionaryFingerprint: Int?
+    /// iPhoneの「ユーザ辞書」から取り込んだ単語
+    static var systemLexiconEntries: [UserDictionaryEntry] = []
 
     /// 共有のエンジン。初めて作ったときは`isNew`がtrue。
     static func engine(store: SettingsStore, versionString: String) -> (engine: AzooKeyEngine, isNew: Bool) {
@@ -120,6 +122,7 @@ final class KeyboardViewController: UIInputViewController {
         guard let session, let store else { return }
         session.updateSettings(store.loadEffectiveSettings())
         session.hasFullAccess = hasFullAccess
+        loadSystemLexicon()
         reloadUserDictionaryIfNeeded()
         if store.consumeLearningResetRequest() {
             conversion?.resetLearning()
@@ -245,11 +248,32 @@ final class KeyboardViewController: UIInputViewController {
         session.rootView.overrideUserInterfaceStyle = proxy.keyboardAppearance == .dark ? .dark : .unspecified
     }
 
+    /// iPhoneの「ユーザ辞書」を読み込む（フルアクセスなしで読める）。表示のたびに読み直し、追加された単語も反映する。
+    private func loadSystemLexicon() {
+        guard store?.loadEffectiveSettings().systemLexiconEnabled ?? true else {
+            SharedConversion.systemLexiconEntries = []
+            return
+        }
+        requestSupplementaryLexicon { [weak self] lexicon in
+            let pairs = lexicon.entries.map { (input: $0.userInput, text: $0.documentText) }
+            let entries = SystemLexicon.userDictionaryEntries(from: pairs)
+            DispatchQueue.main.async {
+                SharedConversion.systemLexiconEntries = entries
+                self?.reloadUserDictionaryIfNeeded()
+            }
+        }
+    }
+
     private func reloadUserDictionaryIfNeeded() {
         guard let store, let conversion else { return }
-        let entries = store.loadUserDictionary()
+        let entries = store.loadUserDictionary() + SharedConversion.systemLexiconEntries
+        // IDは読み込むたびに変わることがあるので、読み・単語・品詞だけで比べる
         var hasher = Hasher()
-        hasher.combine(entries)
+        for entry in entries {
+            hasher.combine(entry.reading)
+            hasher.combine(entry.word)
+            hasher.combine(entry.category)
+        }
         let fingerprint = hasher.finalize()
         guard fingerprint != SharedConversion.userDictionaryFingerprint else { return }
         SharedConversion.userDictionaryFingerprint = fingerprint

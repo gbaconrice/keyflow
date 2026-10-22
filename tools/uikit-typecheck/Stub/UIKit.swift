@@ -302,6 +302,14 @@ open class UIInputViewController: UIViewController {
     open func textWillChange(_ textInput: (any UITextInput)?) {}
     open func textDidChange(_ textInput: (any UITextInput)?) {}
     open func selectionDidChange(_ textInput: (any UITextInput)?) {}
+    open func requestSupplementaryLexicon(completion: @escaping (UILexicon) -> Void) {}
+}
+open class UILexiconEntry: NSObject {
+    open var userInput: String { "" }
+    open var documentText: String { "" }
+}
+open class UILexicon: NSObject {
+    open var entries: [UILexiconEntry] { [] }
 }
 
 extension NSAttributedString.Key {

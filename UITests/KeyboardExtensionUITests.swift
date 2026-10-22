@@ -173,6 +173,11 @@ final class KeyboardExtensionUITests: XCTestCase {
             let text = (editor.value as? String) ?? ""
             note("52-text", text)
             XCTAssertEqual(text, "今日はいい天気")
+            // QWERTY型の数字・記号配列
+            key(app, "toNumber").tap()
+            Thread.sleep(forTimeInterval: 0.5)
+            snap(app, "53-romaji-number")
+            key(app, "toKana").tap()
         } else {
             XCTFail("ローマ字の配列に切り替わらない")
         }

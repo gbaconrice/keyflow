@@ -247,6 +247,10 @@ public final class InputController {
             romajiCharacter(text)
             return
         }
+        if mode == .number {
+            composeCharacter(text)
+            return
+        }
         var output = text
         if mode == .english, shift != .off {
             output = text.uppercased()
@@ -282,6 +286,18 @@ public final class InputController {
             flushRomaji()
             composition.insert(output)
         }
+        compositionChanged()
+    }
+
+    /// 数字・記号の文字キー。12キーの数字配列と同じく入力中の文字列に入れる（「3じ」→「3時」のように変換できるように）。
+    private func composeCharacter(_ text: String) {
+        toggle = nil
+        flushRomaji()
+        if selectedIndex != nil {
+            commitSelectedCandidate(continueComposing: true)
+        }
+        lastCommit = nil
+        composition.insert(text)
         compositionChanged()
     }
 

@@ -25,6 +25,8 @@ python3 eval/compare_cli.py eval/corpus.tsv "A=A/.build/release/CliTool" "B=B/.b
 
 辞書はサブモジュールなので、バージョンごとに別のディレクトリでビルドすること（同じディレクトリで切り替えると、古いバイナリが新しい辞書を読んでしまう）。
 
+エンジンを更新したら、`Packages/KeyFlowKit/Sources/KeyFlowEngine/PartOfSpeech.swift`の品詞IDが新しいエンジンの`DicdataStore._getPredictionUsable`と一致しているかも確かめる（品詞IDの表が変わると、変換の補正が誤って働く）。
+
 ### 2026-10-21 の比較
 
 | | 1位 | 3位以内 | 10位以内 |
