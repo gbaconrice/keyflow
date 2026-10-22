@@ -260,4 +260,25 @@ struct KeyTouchProcessorTests {
         h.processor.touchEnded(id: 1, at: h.center("cursorLeft"), time: 0.5)
         #expect(h.actions == [.cursorLeft, .cursorLeft, .cursorLeft])
     }
+
+    @Test("入力を通知した先でキー配列が切り替わっても落ちない（モード切替キー）")
+    func reentrantLayoutChange() {
+        let h = TouchHarness()
+        h.processor.onAction = { [unowned h] action in
+            h.actions.append(action)
+            // KeyboardViewは配列が変わるとタッチを片付け、新しい配置に差し替える
+            h.processor.cancelAll()
+            h.processor.geometry = LayoutEngine.layout(KeyboardLayouts.english(showsGlobeKey: false), context: .init(width: 393, isLandscape: false, settings: .default))
+        }
+        h.stroke(1, from: h.center("toEnglish"))
+        #expect(h.actions == [.switchMode(.english)])
+        // 2本の指が残っている状態での切り替え
+        h.processor.geometry = h.geometry
+        h.processor.touchBegan(id: 2, at: h.center("a"), time: 1)
+        h.processor.touchBegan(id: 3, at: h.center("toOther"), time: 1.01)
+        h.processor.touchEnded(id: 3, at: h.center("toOther"), time: 1.02)
+        h.processor.touchEnded(id: 2, at: h.center("a"), time: 1.03)
+        h.processor.touchCancelled(id: 2)
+        #expect(h.processor.visual.pressedKeyIDs.isEmpty)
+    }
 }

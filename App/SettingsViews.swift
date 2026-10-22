@@ -105,8 +105,8 @@ struct InputSettingsView: View {
         PreviewedSettings(title: "入力操作") {
             Section {
                 SliderRow(title: "フリックの判定距離", value: $model.settings.flickThreshold, range: KeyboardSettings.Ranges.flickThreshold) { "\(Int($0.rounded())) pt" }
-                Toggle("押している間、フリック先の文字を表示", isOn: $model.settings.showsFlickGuide)
-                Toggle("キーの四隅にフリック先の文字を表示", isOn: $model.settings.showsKeyHints)
+                Toggle("押している間、フリック先を表示", isOn: $model.settings.showsFlickGuide)
+                Toggle("キーの四隅にフリック先を表示", isOn: $model.settings.showsKeyHints)
             } header: {
                 Text("フリック")
             } footer: {

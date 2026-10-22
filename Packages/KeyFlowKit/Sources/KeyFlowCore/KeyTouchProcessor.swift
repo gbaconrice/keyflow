@@ -155,22 +155,23 @@ public final class KeyTouchProcessor {
     }
 
     public func touchEnded(id: Int, at point: CGPoint, time: TimeInterval) {
-        guard let index = touches.firstIndex(where: { $0.id == id }) else { return }
-        let touch = touches[index]
+        guard let touch = touches.first(where: { $0.id == id }) else { return }
         if !touch.finished {
             touch.current = point
             move(touch)
             finish(touch)
         }
-        touches.remove(at: index)
+        // 入力を通知した先でキー配列が切り替わり、タッチが片付けられていることがある（モード切替キーなど）。
+        // そのため位置は通知の後に探し直す。
+        touches.removeAll { $0 === touch }
         release(touch)
         publish()
     }
 
     /// システムにタッチを奪われたとき。入力はしない。
     public func touchCancelled(id: Int) {
-        guard let index = touches.firstIndex(where: { $0.id == id }) else { return }
-        let touch = touches.remove(at: index)
+        guard let touch = touches.first(where: { $0.id == id }) else { return }
+        touches.removeAll { $0 === touch }
         touch.finished = true
         release(touch)
         publish()

@@ -14,6 +14,9 @@ on:
         required: false
         default: "group.jp.keyflow.ime"
 
+permissions:
+  contents: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -91,6 +94,21 @@ jobs:
           name: KeyFlow-ipa
           path: KeyFlow.ipa
           retention-days: 30
+      - name: Publish latest IPA as a release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="$(date -u +%Y-%m-%d) ${GITHUB_SHA::7}"
+          cat > release-notes.md <<NOTES
+          自動ビルド（${VERSION}）
+
+          - \`KeyFlow.ipa\` をダウンロードし、Sideloadlyで署名してインストールします（[手順](https://github.com/${GITHUB_REPOSITORY}/blob/main/docs/INSTALL.md)）。
+          - 無料のApple Accountでの署名は7日で期限が切れます。期限が切れたら、同じファイルでもう一度インストールしてください。
+          - コミット: ${GITHUB_SHA}
+          NOTES
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest KeyFlow.ipa --title "最新ビルド（${VERSION}）" --notes-file release-notes.md --prerelease --target "$GITHUB_SHA"
       - name: Package tests on simulator
         working-directory: Packages/KeyFlowKit
         run: |

@@ -98,6 +98,8 @@ struct KeyboardPreviewPanel: View {
             }
             .frame(height: CGFloat(model.settings.candidateBarHeight + model.settings.portraitKeyAreaHeight))
         }
+        // 画面下端（ホームバーの部分）までキーボードの背景色で埋め、後ろの設定項目が透けないようにする
+        .background(Color(uiColor: KeyboardTheme.background).ignoresSafeArea(edges: .bottom))
     }
 }
 
