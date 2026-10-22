@@ -12,11 +12,10 @@ final class KeyCapView: UIView {
 
     private let capView = UIView()
     private let titleLabel = UILabel()
-    /// フリック先の文字（小さく四隅に表示）
-    private let hintLabels: [FlickDirection: UILabel] = [
-        .left: UILabel(), .up: UILabel(), .right: UILabel(), .down: UILabel(),
-    ]
-    private let subLabel = UILabel()
+    /// フリック先の文字（小さく四隅に表示）。使うときだけ作る（キーの数×4個になるため）
+    private var hintLabels: [FlickDirection: UILabel] = [:]
+    /// 数字キーの記号など。使うときだけ作る
+    private var subLabel: UILabel?
     private let iconView = UIImageView()
 
     private(set) var style: Style = .normal
@@ -46,21 +45,6 @@ final class KeyCapView: UIView {
         titleLabel.baselineAdjustment = .alignCenters
         capView.addSubview(titleLabel)
 
-        for label in hintLabels.values {
-            label.textAlignment = .center
-            label.font = .systemFont(ofSize: 9, weight: .regular)
-            label.textColor = KeyboardTheme.secondaryLabel
-            label.isHidden = true
-            capView.addSubview(label)
-        }
-        subLabel.textAlignment = .center
-        subLabel.font = .systemFont(ofSize: 10, weight: .regular)
-        subLabel.textColor = KeyboardTheme.secondaryLabel
-        subLabel.adjustsFontSizeToFitWidth = true
-        subLabel.minimumScaleFactor = 0.6
-        subLabel.isHidden = true
-        capView.addSubview(subLabel)
-
         iconView.contentMode = .scaleAspectFit
         iconView.isHidden = true
         capView.addSubview(iconView)
@@ -84,30 +68,59 @@ final class KeyCapView: UIView {
             let isLong = (title?.count ?? 0) > 2
             titleLabel.font = .systemFont(ofSize: isLong ? min(fontSize, 16) : fontSize, weight: .regular)
         }
-        for (direction, label) in hintLabels {
+        for direction in [FlickDirection.left, .up, .right, .down] {
             if let hint = hints[direction] {
+                let label = hintLabel(for: direction)
                 label.text = hint
                 label.isHidden = false
             } else {
-                label.isHidden = true
+                hintLabels[direction]?.isHidden = true
             }
         }
         if let subtitle {
-            subLabel.text = subtitle
-            subLabel.isHidden = false
+            let label = makeSubLabelIfNeeded()
+            label.text = subtitle
+            label.isHidden = false
         } else {
-            subLabel.isHidden = true
+            subLabel?.isHidden = true
         }
         updateColors()
         setNeedsLayout()
+    }
+
+    private func hintLabel(for direction: FlickDirection) -> UILabel {
+        if let label = hintLabels[direction] {
+            return label
+        }
+        let label = UILabel()
+        label.textAlignment = .center
+        label.font = .systemFont(ofSize: 9, weight: .regular)
+        label.textColor = KeyboardTheme.secondaryLabel
+        capView.addSubview(label)
+        hintLabels[direction] = label
+        return label
+    }
+
+    private func makeSubLabelIfNeeded() -> UILabel {
+        if let subLabel {
+            return subLabel
+        }
+        let label = UILabel()
+        label.textAlignment = .center
+        label.font = .systemFont(ofSize: 10, weight: .regular)
+        label.textColor = KeyboardTheme.secondaryLabel
+        label.adjustsFontSizeToFitWidth = true
+        label.minimumScaleFactor = 0.6
+        capView.addSubview(label)
+        subLabel = label
+        return label
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
         capView.frame = bounds
         let b = capView.bounds
-        let hasSub = !subLabel.isHidden
-        if hasSub {
+        if let subLabel, !subLabel.isHidden {
             titleLabel.frame = CGRect(x: 2, y: b.height * 0.08, width: b.width - 4, height: b.height * 0.58)
             subLabel.frame = CGRect(x: 2, y: b.height * 0.62, width: b.width - 4, height: b.height * 0.3)
         } else {
