@@ -48,11 +48,14 @@ App Groupsは、アプリで変えた設定やユーザー辞書をキーボー�
 
 ## 1. IPAを入手する
 
-1. GitHubのリポジトリで「Actions」→「Build」→ 最新の成功した実行を開きます。
-2. 下の「Artifacts」から `KeyFlow-ipa` をダウンロードし、zipを展開して `KeyFlow.ipa` を取り出します。
+最新のビルドは次のURLから直接ダウンロードできます（`main`に変更が入るたびに自動で更新されます）。
 
-手動でビルドしたいときは「Actions」→「Build」→「Run workflow」で実行できます。
-バンドルIDが使えないというエラーが出たときは、ここで `bundle_id` と `app_group` を別の値（例: `jp.keyflow.ime.mine` と `group.jp.keyflow.ime.mine`）にして実行し直してください。
+- https://github.com/tanabe0422/keyflow/releases/download/latest/KeyFlow.ipa
+- 更新日時や内容は https://github.com/tanabe0422/keyflow/releases/tag/latest で確認できます。
+
+うまく取れないときは、GitHubの「Actions」→「Build」→ 最新の成功した実行 →「Artifacts」の `KeyFlow-ipa` からも入手できます（zipを展開すると `KeyFlow.ipa` が出てきます）。
+
+バンドルIDが使えないというエラーが出たときは、「Actions」→「Build」→「Run workflow」で `bundle_id` と `app_group` を別の値（例: `jp.keyflow.ime.mine` と `group.jp.keyflow.ime.mine`）にして実行し、Artifactsから入手してください。
 
 ## 2. Sideloadlyで署名してインストールする
 
