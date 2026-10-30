@@ -16,7 +16,7 @@
 | CI（GitHub Actions） | 動作中 | push のたびに、Linuxテスト・iOSビルド・IPA作成・シミュレーターテスト・リリース公開 |
 | 実機インストール | 未実施 | — |
 
-最新のIPA: https://github.com/tanabe0422/keyflow/releases/download/latest/KeyFlow.ipa
+最新のIPA: https://github.com/gbaconrice/keyflow/releases/download/latest/KeyFlow.ipa
 
 ### 次にやること
 1. 利用者がdocs/INSTALL.mdの手順で実機にインストールし、下の「実機確認項目」を確かめる
@@ -105,7 +105,7 @@
 - タッチ処理を`KeyTouchProcessor`としてKeyFlowCoreに移し、座標・時刻の再現テストを18件追加
 - 「数字・何＋じ」の変換の補正を追加（全体の1位正解率 85%→87%、英数字混じり 81%→90%）
 - 候補の長押しで学習を取り消す機能、アプリの「使い方」画面を追加
-- GitHubに接続し、リポジトリ tanabe0422/keyflow を作成。CIでiOSビルド・テスト・IPAの公開まで通るようにした
+- GitHubに接続し、リポジトリ gbaconrice/keyflow を作成。CIでiOSビルド・テスト・IPAの公開まで通るようにした
 - シミュレーターで実際のキーボード拡張を動かすUIテストを追加（入力・変換、入力中のタップ、ダークモード・横画面、ローマ字）
 - ローマ字入力（QWERTY）を追加。候補バーの右端のフェード、英字に切り替えたときの予測候補の消去
 - 変換エンジンをプロセスに1つにまとめ、CIでキーボード拡張のメモリを計測するようにした
